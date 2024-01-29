@@ -1,0 +1,10 @@
+---
+title: "Group Report"
+author: "Group 2"
+format: pdf
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+```
