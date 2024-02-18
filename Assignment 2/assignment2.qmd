@@ -3,25 +3,52 @@ title: "Assignment 2"
 author: "Group 2"
 format: pdf
 editor: visual
+date: Feb-18-2024
+execute: 
+  warning: false
+  message: false
 ---
 
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
-
+```{r, echo=FALSE}
+library(tidyverse)
+library(here)
+library(sf)
+```
+### Question 1
+Our group discussed that we need to expand the LAT data set with multiple locations. This is because, once we done that,the unite of analysis in the cleaned data set would be per labor action and per location. Each row will only contain one geographical location. 
+In this case, we can build correlations to find which country may have higher possibilities to have a certain type of labor action. Moreover, in this case, we can combine geo-econ data into each row, such as GDP, working population etc. according to each location. If we did not separate the locations, some rows may have multiple locations and also more than one geo-econ data.
 ```{r}
-1 + 1
+LAT <- readxl::read_xlsx(here("Data Raw/Labor action tracker data 12.4.23.xlsx"))
+
+data <- LAT %>%
+  mutate(
+    coordinate = ifelse(
+      `Number of Locations` > 1,
+      strsplit(as.character(`Latitude, Longitude`), ";\\s*"),
+      `Latitude, Longitude`
+    ))%>%  
+  unnest(coordinate)
+```
+### Question 2
+```{r}
+county <- tigris::counties(cb = TRUE)
+data <- separate(data, coordinate, into = c("lat", "lon"), 
+                 sep = ",\\s*", remove = FALSE)
+data <- data %>%
+  mutate(
+    lat = as.numeric(lat),
+    lon = as.numeric(lon))
+data$lon[2830] = -85.73642799999999
+na_summary <- data %>%
+  summarise_all(~ sum(is.na(.)))
+
+data <- st_as_sf(data, coords = c("lon", "lat"))
+st_crs(data) <- st_crs(county)
+data <- st_join(data, county)
+vars <- names(LAT)
+data <- data %>%
+  select(c(vars, NAME, GEOID))
 ```
 
-You can add options to executable code like this
 
-```{r}
-#| echo: false
-2 * 2
-```
 
-The `echo: false` option disables the printing of code (only output is displayed).
