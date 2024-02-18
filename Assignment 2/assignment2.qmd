@@ -47,7 +47,8 @@ st_crs(data) <- st_crs(county)
 data <- st_join(data, county)
 vars <- names(LAT)
 data <- data %>%
-  select(c(vars, NAME, GEOID))
+  select(c(vars, NAME, GEOID)) %>%
+  rename(county = NAME)
 ```
 
 
