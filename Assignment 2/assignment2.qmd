@@ -1,7 +1,8 @@
 ---
 title: "Assignment 2"
 author: "Group 2"
-format: pdf
+#format: pdf
+output: html
 editor: visual
 date: Feb-18-2024
 execute: 
@@ -96,7 +97,7 @@ print(result)
 
 3\. Suggestion with *tigris* package. (Final version. Our group will be using this solution to generate county variable.)
 
-```{r}
+```{r, output=FALSE}
 # retrieve data frame from tigris package that contains US counties infomation and geometric data
 county <- tigris::counties(cb = TRUE)
 # the goal is to join 2 data frame with geometric attributes.
@@ -123,5 +124,18 @@ data <- st_join(data, county)
 vars <- names(LAT)
 data <- data %>%
   select(c(vars, NAME, GEOID)) %>%
-  rename(county = NAME)
+  rename(county = NAME) %>%
+  select(1:10, 23, 11:22, 24:25)
+```
+
+In general, Chatgpt is helpful in terms of offering basic ideas of how we can acheive it. It shows that in order to generate a variable that contains US county names with Lon/Lat data, the basic idea is to match and join the LAT data with a data frame that has US county information. Without specific instruction, however, Chatgpt would generate complicated solution with redundant codes and rarely used packages. Because our group has team members who took QGIS prior to the course and are familiar with *sf* package. In this case, with the basic ideas and reference of packages that can retrieve US county information from Chatgpt, It would be more convenient and helpful than just simply relying on Chatgpt to generate the solution from scratch.
+
+#### Reference
+
+`https://chat.openai.com/share/feb074a5-0d50-4df5-84f4-05353f8d041c` `https://stackoverflow.com/questions/13316185/r-convert-zipcode-or-lat-long-to-county`
+
+### Question 3
+
+```{r}
+knitr::kable(head(data))
 ```
