@@ -12,6 +12,7 @@ execute:
 ```{r Package}
 library(tidycensus)
 library(tidyverse)
+hhgg
 
 ```
 
@@ -21,7 +22,7 @@ vars <- c(
   "B19122_001E",
   "DP03_0025E",
   "B25064_001E",
-  "B19058",
+  "B19058_001E",
   "DP02_0068E",
   "DP05_0033E",
   "DP03_0048PE"
