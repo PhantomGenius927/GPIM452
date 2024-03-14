@@ -9,3 +9,30 @@ execute:
   message: false
 ---
 
+```{r Package}
+library(tidycensus)
+library(tidyverse)
+
+```
+
+```{r Define Data variable name}
+vars <- c(
+  "B06011_001E",
+  "B19122_001E",
+  "DP03_0025E",
+  "B25064_001E",
+  "B19058",
+  "DP02_0068E",
+  "DP05_0033E",
+  "DP03_0048PE"
+  )
+
+ACS <- get_acs(geography = "county", 
+                    variables = vars, 
+                    year = 2022,
+                    survey = "acs1", 
+                    output = "wide")
+
+LAT_train <- here::here("Data Raw/Labor action tracker data 12.4.23.xlsx")
+LAT_test <- here::here("Data Raw/Labor action tracker data 2.26.24.xlsx")
+```
