@@ -12,7 +12,9 @@ execute:
 ```{r Package}
 library(tidycensus)
 library(tidyverse)
-Edison
+library(tidymodels) # collection of packages for machine learning 
+library(kknn) # package for k-nearest neighbors models
+
 ```
 
 ```{r Define Data variable name}
@@ -24,7 +26,6 @@ vars <- c(
   "B19058_001E",# Public Assistance Income or Food Stamps/SNAP in the Past 12 Months for Households 
   "DP02_0068E",# Total population over 25 years with bachelor's degree or higher
   "DP02_0059E", # Total population over 25 years
-  "DP05_0033E",
   "DP03_0048PE"
   )
 
@@ -36,4 +37,8 @@ ACS <- get_acs(geography = "county",
 
 LAT_train <- here::here("Data Raw/Labor action tracker data 12.4.23.xlsx")
 LAT_test <- here::here("Data Raw/Labor action tracker data 2.26.24.xlsx")
+```
+
+```{r Qing KNN}
+
 ```
