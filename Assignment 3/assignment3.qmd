@@ -12,7 +12,6 @@ execute:
 ```{r Package}
 library(tidycensus)
 library(tidyverse)
-hhgg
 
 ```
 
@@ -22,8 +21,9 @@ vars <- c(
   "B19122_001E",
   "DP03_0025E",
   "B25064_001E",
-  "B19058_001E",
-  "DP02_0068E",
+  "B19058_001E",# Public Assistance Income or Food Stamps/SNAP in the Past 12 Months for Households 
+  "DP02_0068E",# Total population over 25 years with bachelor's degree or higher
+  "DP02_0059E", # Total population over 25 years
   "DP05_0033E",
   "DP03_0048PE"
   )
