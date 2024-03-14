@@ -37,3 +37,8 @@ ACS <- get_acs(geography = "county",
 LAT_train <- here::here("Data Raw/Labor action tracker data 12.4.23.xlsx")
 LAT_test <- here::here("Data Raw/Labor action tracker data 2.26.24.xlsx")
 ```
+
+```{r KNN Qing}
+
+
+```
