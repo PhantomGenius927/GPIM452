@@ -44,3 +44,15 @@ LAT_test <- here::here("Data Raw/Labor action tracker data 2.26.24.xlsx")
 
 
 ```
+
+```{r LASSO}
+
+
+```
+
+```{r Random Forest}
+
+
+```
+
+
