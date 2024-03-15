@@ -631,7 +631,6 @@ rf_data_test <- testing(rf_split)
 Let's try fitting a *single* random forest using the `rand_forest` model:
 
 ```{r}
-# Create model specification 
 rf_model1 <- rand_forest(
   mtry = 1,   # number of predictors randomly selected at each split
   min_n = 5,  # minimum number of data points in a node for it to be possible to split further
@@ -643,7 +642,8 @@ rf_model1 <- rand_forest(
 
 # Create recipe
 rf_recipe1 <- recipe(strike_f ~ median_inc + earners + travel_work + rent +
-          assi_income + employed + poverty_rate + ba_rate, data = rf_data_train, na.action = "na.pass")
+          assi_income + employed + poverty_rate + ba_rate, data = rf_data_train) %>%
+  step_impute_mean(all_predictors())
 
 # Create workflow
 
