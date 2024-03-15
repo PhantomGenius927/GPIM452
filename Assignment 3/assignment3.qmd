@@ -515,11 +515,15 @@ paste("Model 5 accuracy:", round(knn_success_tm5, 3))
 
 lasso_split <- initial_split(data_train, prop = 0.8, strata = strike_f)
 data_lasso_train <- training(lasso_split)
+data_lasso_train <- data_lasso_train %>%
+  select(-geometry)
 data_lasso_test <- testing(lasso_split)
+data_lasso_test <- data_lasso_test %>%
+  select(-geometry)
 
 lasso_world_recipe <- 
-  recipe(strike_f ~ median_inc + earners + travel_work + rent +
-          assi_income + employed+poverty_rate+ba_rate+Authorized, data = data_lasso_train) |>
+  recipe(strike ~ median_inc + earners + travel_work + rent +
+          assi_income + employed+poverty_rate+ba_rate, data = data_lasso_train) |>
   step_dummy(all_nominal(), -all_outcomes()) %>%
   step_impute_mean(all_predictors())
 
