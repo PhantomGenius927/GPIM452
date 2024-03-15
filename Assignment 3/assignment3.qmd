@@ -48,6 +48,7 @@ LAT_test <- readxl::read_xlsx("Data Raw/Labor action tracker data 2.26.24.xlsx")
 ```
 
 ## Data Cleaning--LAT
+
 ```{r Data Cleaning--LAT Junyi & Edison, output=FALSE}
 county <- tigris::counties(cb = TRUE)
 #----------
@@ -120,6 +121,7 @@ LAT_test <- LAT_test %>%
 ```
 
 ## Data Cleaning--ACS
+
 ```{r Data Cleaning--ACS Junyi & Edison, output=FALSE}
 ACS <- ACS %>%  
   select(GEOID, ends_with("E")) %>%
@@ -143,6 +145,7 @@ ACS <- ACS %>%
 ```
 
 ## Training Data and Test Data
+
 ```{r Training & Testing Data Junyi & Edison, output=FALSE}
 #Here is the final data set with all acs variables and the LAT data
 #Since around 90% of the duration was NAs, so I did not unify the time into a new column.
@@ -177,12 +180,19 @@ write_csv(data_test, "Data Clean/data_test.csv")
 ```
 
 ## Logit
+
 ```{r LOGSTIC Junyi}
 # I also build the log model. This is because I think LASSO implys that the relationship should be linear. However, our dependent variable is a dummy variable. In this case, it would make sense a lot to do logisitic.
 
 
 #Since run the log, our dependent variable should be a factor, so I create a new variable specifically for the factor version of "strike"
-
+logistic_split <- initial_split(data_train, prop = 0.8, strata = strike_f)
+data_logistic_train <- training(logistic_split)
+data_logistic_train <- data_logistic_train %>%
+  select(-geometry)
+data_logistic_test <- testing(logistic_split)
+data_logistic_test <- data_logistic_test %>%
+  select(-geometry)
 
 # 1. Specify the Logistic Regression Model
 logistic_spec <- logistic_reg() %>% 
@@ -192,7 +202,7 @@ logistic_spec <- logistic_reg() %>%
 # 2. Prepare the Recipe
 logistic_recipe <- 
   recipe(strike_f ~ median_inc + earners + travel_work + rent +
-          assi_income + employed+poverty_rate+ba_rate+Authorized, data = data_train) |>
+          assi_income + employed+poverty_rate+ba_rate+Authorized, data = data_logistic_train) |>
   step_dummy(all_nominal(), -all_outcomes()) %>%
   step_impute_mean(all_predictors())
 
@@ -203,12 +213,12 @@ logistic_workflow <- workflow() %>%
 
 # 4. Fit the Model to Your Training Data
 logistic_fit <- logistic_workflow %>% 
-  fit(data = data_train)
+  fit(data = data_logistic_train)
 
 # 5. Predict on the Test Data
 test_predictions <- logistic_fit %>% 
   predict(new_data = data_test) %>% 
-  bind_cols(data_test)
+  bind_cols(data_logistic_test)
 
 
 # To convert probabilities to binary outcome (assuming the class of interest is 1)
@@ -226,10 +236,35 @@ summary(logistic_conf_mat)
 
 # Visualize the confusion matrix (if desired)
 autoplot(logistic_conf_mat)
+
+
+#----------
+# Matrixs for LAT Test Data
+#----------
+
+test_predictions <- logistic_fit %>% 
+  predict(new_data = data_test) %>% 
+  bind_cols(data_test)
+
+# To convert probabilities to binary outcome
+logistic_new_test_predictions <- test_predictions %>%
+  mutate(predicted_class = .pred_class,actual_class = strike_f)
+
+# 6. Evaluate the Model
+logistic_test_conf_mat <- conf_mat(logistic_new_test_predictions, truth = actual_class, estimate = predicted_class)
+
+# Print the confusion matrix
+print(logistic_test_conf_mat)
+
+# Optionally, print summary metrics
+summary(logistic_test_conf_mat)
+
+# Visualize the confusion matrix (if desired)
+autoplot(logistic_test_conf_mat)
 ```
 
-
 ## KNN
+
 ```{r KNN Qing}
 # Defining the "recipe" to preprocess the data
 
@@ -512,6 +547,7 @@ paste("Model 5 accuracy:", round(knn_success_tm5, 3))
 ```
 
 ## LASSO
+
 ```{r LASSO Junyi}
 # Here I create LASSO through find the best penalty to train my model and create the confusion matrixs
 
@@ -617,10 +653,34 @@ print(lasso_conf_mat)
 # For detailed evaluation metrics
 lasso_conf_mat %>%
   summary()
+
+#----------
+# Matrixs for LAT Test Data
+#----------
+
+final_lasso_fitted_test <- final_lasso %>% 
+  fit(data = data_lasso_train)
+
+test_predictions <- predict(final_lasso_fitted_test, new_data = data_test) %>% 
+  bind_cols(data_test)# Binding the predictions with the actual outcomes
+
+lasso_new_test_predictions <- test_predictions %>%
+  mutate(predicted_class = as.factor(if_else(.pred >= 0.5, 1, 0)),
+         actual_class = as.factor(strike_f))
+
+# Create a confusion matrix
+lasso_new_conf_mat <- conf_mat(lasso_new_test_predictions, truth = actual_class, estimate = predicted_class)
+
+# Print the confusion matrix
+print(lasso_new_conf_mat)
+
+# For detailed evaluation metrics
+lasso_new_conf_mat %>%
+  summary()
 ```
 
-
 ## Random Forest
+
 ```{r Random Forest Testing Edison}
 rf_split <- initial_split(data_train, prop = 0.8, strata = strike)
 rf_data_train <- training(rf_split)
