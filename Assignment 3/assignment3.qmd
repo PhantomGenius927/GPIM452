@@ -160,8 +160,8 @@ data_train <- data_train %>%
 data_test <- data_test %>% 
   mutate(Strike_or_not = ifelse(`Strike or Protest`== "Strike",1,0))
 
-
-
+write_csv(data_train, "Data Clean/data_train.csv")
+write_csv(data_test, "Data Clean/data_test.csv")
 
 ```
 
