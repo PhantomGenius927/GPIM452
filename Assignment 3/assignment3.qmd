@@ -15,6 +15,9 @@ library(tidyverse)
 library(tidymodels) # collection of packages for machine learning 
 library(kknn) # package for k-nearest neighbors models
 library(sf)
+library(rpart)
+library(ranger)
+library(vip)
 
 # setting randomization parameter
 set.seed(315)
@@ -623,3 +626,197 @@ lasso_conf_mat %>%
 
 
 ```
+
+The tidymodels package is the state of the art for machine learning in R. It is a collection of packages designed to implement machine learning models using the tidyverse framework.
+
+```{r}
+# Set random number seed to ensure reproducability
+# tidy models makes it easy to split data into a training set and testing set
+# without fiddling around with manual indexing in R
+wern_split <- initial_split(wern, prop = 0.8, strata = union_vote)
+wern_train <- training(wern_split)
+wern_test <- testing(wern_split)
+```
+
+
+Let's first fit one single decision tree
+
+```{r}
+# Fitting decision tree
+
+tree_model <- rpart(union_vote ~ ., data = wern_train, method = "class")
+
+# Print the summary of the tree
+summary(tree_model)
+
+# Plot the decision tree
+plot(tree_model)
+text(tree_model, pretty = 0)
+
+# fitting the same decision tree to a slightly different dataset
+tree_model2 <- rpart(union_vote ~ ., data = wern_train[-c(1:100),], method = "class")
+plot(tree_model2)
+text(tree_model2, pretty = 0)
+
+#trees differ!
+
+dt_hat <- predict(tree_model, newdata = wern_test, type="class")
+dt_hat2 <- predict(tree_model2, newdata = wern_test, type="class")
+
+# Generating confusion matrix
+cm <- caret::confusionMatrix(data=dt_hat, reference=as.factor(wern_test$union_vote))
+cm2 <- caret::confusionMatrix(data=dt_hat2, reference=as.factor(wern_test$union_vote))
+
+cm 
+cm2
+
+```
+
+# Discussion question:  What do you think is going on here?  What is this an example of?
+
+
+
+Let's try fitting a *single* random forest using the `rand_forest` model:
+
+```{r}
+# Create model specification 
+rf_model <- rand_forest(
+  mtry = 5,   # number of predictors randomly selected at each split
+  min_n = 5,  # minimum number of data points in a node for it to be possible to split further
+  trees = 50  # no. of trees in the ensemble
+  ) %>%  
+  set_mode("classification") %>%
+  set_engine("ranger",
+             importance = "impurity") #allows for variable important calculation 
+
+# Create recipe
+rf_recipe <- recipe(union_vote ~ ., data = wern_train)
+
+# Create workflow
+
+rf_wflow <- workflow() %>%
+  add_recipe(rf_recipe) %>%
+  add_model(rf_model)
+
+rf_single <- rf_wflow |> 
+  fit(data=wern_train)
+
+vip::vip(rf_single)
+
+```
+
+Random forests have *multiple* hyperparameters than need tuning. 
+
+We will focus on tuning two: `mtry` (the number of predictors considered) and `trees`.  We will use 10-fold cross-validation in the training set to find the appropriate values of the tuning parameters 
+
+Let's create the `rsample` object for using 3 folds. Then, we'll tune the
+grid. This time, we'll just specify `grid = 10` to indicate we want 10
+hyperparameter configurations. The `dials` package, in this case, will
+automatically choose those values for us.
+
+```{r}
+
+rf_model <- rand_forest(
+  mtry = tune(),
+  min_n = 5,
+  trees = tune()) %>%  
+  set_mode("classification") %>%
+  set_engine("ranger",
+             importance = "impurity") 
+
+# Create recipe
+
+rf_recipe <- recipe(union_vote ~ ., data = wern_train)
+  
+# Create workflow
+rf_wflow <- workflow() %>%
+  add_recipe(rf_recipe) %>%
+  add_model(rf_model)
+
+
+# Generate cross-validation sets for tuning our model 
+trees_folds <- vfold_cv(wern_train, v = 10)
+
+# Create a set of tuning parameter values to search over
+rf_grid <- dials::grid_regular(   #automatically constructs a set of values to try
+  mtry(range = c(1, ncol(wern_train) - 1)),
+  trees(range = c(100,1000)),
+  levels = 5
+)
+```
+
+*STOP.  What is `rf_grid`?  what should it look like it you type `print(rf_grid)` *
+
+
+```{r}
+
+# Find appropriate tuning parameters
+start.time <- Sys.time()
+rf_fit <- tune_grid(
+  object = rf_wflow, 
+  resamples = trees_folds, 
+  grid = rf_grid)
+end.time <- Sys.time()
+end.time - start.time
+
+```
+
+We're going to use a new metric this time called the ROC-AUC. This is the Area Under the Curve for the Receiver-Operator Characteristic curve. The
+main takeaway for this metric is that it tells us how good our probability predictions are, rather than just the predictions. In classification settings, it's often preferable to the accuracy. It varies from 0 to 1, where larger is better:
+
+```{r}
+# View the ROC metric across models 
+rf_fit %>% 
+  collect_metrics() %>%
+  filter(.metric == "roc_auc") %>%
+  select(mean, mtry, trees)
+```
+
+Now, let's finalize the workflow:
+
+```{r}
+# Select the best RF model 
+best_rf_auc <- select_best(rf_fit, "roc_auc")
+#best_rf_acc <- select_best(rf_fit, "accuracy")
+
+final_rf_wflow <- rf_wflow %>%
+  finalize_workflow(parameters = best_rf_auc) %>%
+  fit(data = wern_train)
+
+#visualize the most important features
+vip(final_rf_wflow)
+```
+
+And evaluate the model's performance:
+
+```{r}
+y_hat_oos<-predict(final_rf_wflow, new_data = wern_test) |> 
+  as_tibble()
+
+caret::confusionMatrix(data=y_hat_oos$.pred_class, reference=as.factor(wern_test$union_vote))
+
+```
+
+*GROUP EXERCISE: Go back and re-run the "best" RF model, only use accuracy as the metric for the "best" model.  Compare this version of the RF to the one chosen based on ROC-AUC* 
+```{r}
+# Select the best RF model 
+best_acc <- select_best(rf_fit, "accuracy")
+
+final_acc_wflow <- rf_wflow %>%
+  finalize_workflow(parameters = best_acc) %>%
+  fit(data = wern_train)
+
+#visualize the most important features
+vip(final_acc_wflow)
+```
+
+
+```{r}
+y_hat_oos<-predict(final_acc_wflow, new_data = wern_test) |> 
+  as_tibble()
+
+caret::confusionMatrix(data=y_hat_oos$.pred_class, reference=as.factor(wern_test$union_vote))
+
+```
+
+
