@@ -174,7 +174,6 @@ data_train$strike_f <- as.factor(data_train$strike)
 
 write_csv(data_train, "Data Clean/data_train.csv")
 write_csv(data_test, "Data Clean/data_test.csv")
-
 ```
 
 ## Logit
@@ -526,7 +525,7 @@ data_lasso_test <- data_lasso_test %>%
 
 lasso_world_recipe <- 
   recipe(strike ~ median_inc + earners + travel_work + rent +
-          assi_income + employed+poverty_rate+ba_rate, data = data_lasso_train) |>
+          assi_income + employed+poverty_rate+ba_rate+Authorized, data = data_lasso_train) |>
   step_dummy(all_nominal(), -all_outcomes()) %>%
   step_impute_mean(all_predictors())
 
@@ -671,10 +670,6 @@ cm
 cm2
 
 ```
-
-# Discussion question:  What do you think is going on here?  What is this an example of?
-
-
 
 Let's try fitting a *single* random forest using the `rand_forest` model:
 
