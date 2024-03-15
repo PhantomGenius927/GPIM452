@@ -461,6 +461,61 @@ paste("Model 5 accuracy:", round(success_tm5, 3))
 
 ```
 
+```{r LOGSTIC-Junyi}
+# I also build the log model. This is because I think LASSO implys that the relationship should be linear. However, our dependent variable is a dummy variable. In this case, it would make sense a lot to do logisitic.
+
+set.seed(100)
+
+#Since run the log, our dependent variable should be a factor, so I create a new variable specifically for the factor version of "Strike_or_not"
+
+data_test$factor_strike <- as.factor(data_test$Strike_or_not)
+data_train$factor_strike <- as.factor(data_train$Strike_or_not)
+
+# 1. Specify the Logistic Regression Model
+logistic_spec <- logistic_reg() %>% 
+  set_engine("glm") %>% 
+  set_mode("classification")
+
+# 2. Prepare the Recipe
+world_recipe <- 
+  recipe(factor_strike ~ median_inc + earners + travel_work + rent +
+          assi_income + employed+poverty_rate+ba_rate+Authorized, data = data_train) |>
+  step_dummy(all_nominal(), -all_outcomes()) %>%
+  step_impute_mean(all_predictors())
+
+# 3. Bundle the Model and Recipe into a Workflow
+logistic_workflow <- workflow() %>% 
+  add_model(logistic_spec) %>% 
+  add_recipe(world_recipe)
+
+# 4. Fit the Model to Your Training Data
+logistic_fit <- logistic_workflow %>% 
+  fit(data = data_train)
+
+# 5. Predict on the Test Data
+test_predictions <- logistic_fit %>% 
+  predict(new_data = data_test) %>% 
+  bind_cols(data_test)
+
+
+# To convert probabilities to binary outcome (assuming the class of interest is 1)
+test_predictions <- test_predictions %>%
+  mutate(predicted_class = .pred_class,actual_class = factor_strike)
+
+# 6. Evaluate the Model
+conf_mat <- conf_mat(test_predictions, truth = actual_class, estimate = predicted_class)
+
+# Print the confusion matrix
+print(conf_mat)
+
+# Optionally, print summary metrics
+summary(conf_mat)
+
+# Visualize the confusion matrix (if desired)
+autoplot(conf_mat)
+
+
+```
 ```{r Random Forest}
 
 
