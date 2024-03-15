@@ -14,19 +14,22 @@ library(tidycensus)
 library(tidyverse)
 library(tidymodels) # collection of packages for machine learning 
 library(kknn) # package for k-nearest neighbors models
-
+library(tidymodels)
+library(sf)
 ```
 
 ```{r Define Data variable name}
 vars <- c(
-  "B06011_001E",
-  "B19122_001E",
-  "DP03_0025E",
-  "B25064_001E",
+  "B06011_001E", # mean income
+  "B19122_001E", # household earner
+  "DP03_0025E", # Median Gross Rent (Dollars)
+  "B25064_001E", # Mean travel time to work (minutes)
   "B19058_001E",# Public Assistance Income or Food Stamps/SNAP in the Past 12 Months for Households 
   "DP02_0068E",# Total population over 25 years with bachelor's degree or higher
   "DP02_0059E", # Total population over 25 years
-  "DP03_0048PE"
+  "DP03_0048PE", # Civilian employed population 16 years and over
+  "B17001_001E", # total_pop
+  "B17001_002E" # below_poverty
   )
 
 ACS <- get_acs(geography = "county", 
@@ -35,10 +38,131 @@ ACS <- get_acs(geography = "county",
                     survey = "acs1", 
                     output = "wide")
 
-LAT_train <- here::here("Data Raw/Labor action tracker data 12.4.23.xlsx")
-LAT_test <- here::here("Data Raw/Labor action tracker data 2.26.24.xlsx")
+LAT_train <- readxl::read_xlsx("Data Raw/Labor action tracker data 12.4.23.xlsx")
+LAT_test <- readxl::read_xlsx("Data Raw/Labor action tracker data 2.26.24.xlsx")
 ```
 
+```{r Data Cleaning--LAT, output=FALSE}
+county <- tigris::counties(cb = TRUE)
+#----------
+# LAT Train Data
+#----------
+LAT_train <- LAT_train %>%
+  mutate(
+    coordinate = ifelse(
+      `Number of Locations` > 1,
+      strsplit(as.character(`Latitude, Longitude`), ";\\s*"),
+      `Latitude, Longitude`
+    ))%>%  
+  unnest(coordinate)
+LAT_train <- separate(LAT_train, coordinate, into = c("lat", "lon"), 
+                 sep = ",\\s*", remove = FALSE)
+# check is there any NAs 
+LAT_train <- LAT_train %>%
+  mutate(
+    lat = as.numeric(lat),
+    lon = as.numeric(lon))
+na_summary <- LAT_train %>%
+  summarise_all(~ sum(is.na(.)))
+# yes, there is one in lon column. 
+LAT_train$lon[2830] = -85.73642799999999
+# transform LAT data into geometric data frame
+LAT_train <- st_as_sf(LAT_train, coords = c("lon", "lat"))
+# matching same projection
+st_crs(LAT_train) <- st_crs(county)
+# joining 2 geometric data frames
+LAT_train <- st_join(LAT_train, county)
+# housekeeping and make LAT data looks clean and organized
+vars <- names(LAT_train)
+LAT_train <- LAT_train %>%
+  select(c(all_of(vars), NAMELSAD, GEOID)) %>%
+  rename(County = NAMELSAD) %>%
+  select(1:10, 23, 11:22, 24, 29, 31)
+
+#----------
+# LAT Test Data
+#----------
+LAT_test <- LAT_test %>%
+  mutate(
+    coordinate = ifelse(
+      `Number of Locations` > 1,
+      strsplit(as.character(`Latitude, Longitude`), ";\\s*"),
+      `Latitude, Longitude`
+    ))%>%  
+  unnest(coordinate)
+LAT_test <- separate(LAT_test, coordinate, into = c("lat", "lon"), 
+                 sep = ",\\s*", remove = FALSE)
+# check is there any NAs 
+LAT_test <- LAT_test %>%
+  mutate(
+    lat = as.numeric(lat),
+    lon = as.numeric(lon))
+na_summary <- LAT_test %>%
+  summarise_all(~ sum(is.na(.))) # There is no NAs
+
+LAT_test <- st_as_sf(LAT_test, coords = c("lon", "lat"))
+# matching same projection
+st_crs(LAT_test) <- st_crs(county)
+# joining 2 geometric data frames
+LAT_test <- st_join(LAT_test, county)
+# housekeeping and make LAT data looks clean and organized
+vars <- names(LAT_test)
+LAT_test <- LAT_test %>%
+  select(c(all_of(vars), NAMELSAD, GEOID)) %>%
+  rename(County = NAMELSAD) %>%
+  select(1:10, 23, 11:22, 24, 29, 31)
+```
+
+
+```{r Data Cleaning--ACS}
+ACS <- ACS %>%  
+  select(GEOID, ends_with("E")) %>%
+  separate(col = "NAME", into = c("County", "State"), sep = ",") %>%
+  rename(
+    "median_inc" = "B06011_001E",
+    "earners" = "B19122_001E",
+    "travel_work"="DP03_0025E",
+    "total_pop" = "B17001_001E",
+    "below_poverty" = "B17001_002E",
+    "rent" = "B25064_001E",
+    "assi_income"= "B19058_001E",
+    "ba_pop"= "DP02_0068E",
+    "total_pop25"="DP02_0059E",
+    "employed"="DP03_0048PE" # Civilian employed population 16 years and over
+) %>%
+  mutate(
+    poverty_rate = below_poverty/total_pop,
+    ba_rate = ba_pop/total_pop
+  )
+
+
+```
+
+```{r Train & Test Data}
+#Here is the final data set with all acs variables and the LAT data
+#Since around 90% of the duration was NAs, so I did not unify the time into a new column.
+
+data_train <- left_join(LAT_train, ACS, by="GEOID")
+data_train <- as.data.frame(data_train)
+data_train <- data_train  %>%
+  select(-ends_with(".x")) %>%
+  select(-ends_with(".y"))
+
+data_test <- left_join(LAT_test, ACS, by="GEOID")
+data_test <- as.data.frame(data_test)
+data_test <- data_test  %>%
+  select(-ends_with(".x")) %>%
+  select(-ends_with(".y"))
+
+# A new column I combine the other two labor actions into non-strike 
+data_train <- data_train %>% 
+  mutate(Strike_or_not = ifelse(`Strike or Protest`== "Strike",1,0))
+data_test <- data_test %>% 
+  mutate(Strike_or_not = ifelse(`Strike or Protest`== "Strike",1,0))
+
+
+
+```
 
 ```{r KNN Qing}
 
