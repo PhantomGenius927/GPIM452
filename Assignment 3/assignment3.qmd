@@ -621,54 +621,19 @@ lasso_conf_mat %>%
 
 
 ## Random Forest
-```{r Random Forest Edison}
+```{r Random Forest Testing Edison}
 rf_split <- initial_split(data_train, prop = 0.8, strata = strike)
 rf_data_train <- training(rf_split)
+rf_data_train <- rf_data_train %>%
+  select(-geometry)
 rf_data_test <- testing(rf_split)
-
-```
-
-Let's try fitting a *single* random forest using the `rand_forest` model:
-
-```{r}
-rf_model1 <- rand_forest(
-  mtry = 1,   # number of predictors randomly selected at each split
-  min_n = 5,  # minimum number of data points in a node for it to be possible to split further
-  trees = 50  # no. of trees in the ensemble
-  ) %>%  
-  set_mode("classification") %>%
-  set_engine("ranger",
-             importance = "impurity") #allows for variable important calculation 
+rf_data_test <- rf_data_test %>%
+  select(-geometry)
 
 # Create recipe
 rf_recipe1 <- recipe(strike_f ~ median_inc + earners + travel_work + rent +
           assi_income + employed + poverty_rate + ba_rate, data = rf_data_train) %>%
   step_impute_mean(all_predictors())
-
-# Create workflow
-
-rf_wflow1 <- workflow() %>%
-  add_recipe(rf_recipe1) %>%
-  add_model(rf_model1)
-
-rf_single <- rf_wflow1 |> 
-  fit(data=rf_data_train)
-
-vip(rf_single)
-
-
-```
-
-Random forests have *multiple* hyperparameters than need tuning. 
-
-We will focus on tuning two: `mtry` (the number of predictors considered) and `trees`.  We will use 10-fold cross-validation in the training set to find the appropriate values of the tuning parameters 
-
-Let's create the `rsample` object for using 3 folds. Then, we'll tune the
-grid. This time, we'll just specify `grid = 10` to indicate we want 10
-hyperparameter configurations. The `dials` package, in this case, will
-automatically choose those values for us.
-
-```{r}
 
 rf_model <- rand_forest(
   mtry = tune(),
@@ -678,99 +643,152 @@ rf_model <- rand_forest(
   set_engine("ranger",
              importance = "impurity") 
 
-# Create recipe
-
-rf_recipe <- recipe(union_vote ~ ., data = wern_train)
-  
 # Create workflow
 rf_wflow <- workflow() %>%
-  add_recipe(rf_recipe) %>%
+  add_recipe(rf_recipe1) %>%
   add_model(rf_model)
 
 
 # Generate cross-validation sets for tuning our model 
-trees_folds <- vfold_cv(wern_train, v = 10)
+rf_folds <- vfold_cv(rf_data_train, v = 10)
 
 # Create a set of tuning parameter values to search over
-rf_grid <- dials::grid_regular(   #automatically constructs a set of values to try
-  mtry(range = c(1, ncol(wern_train) - 1)),
-  trees(range = c(100,1000)),
+rf_grid <- dials::grid_regular(
+  mtry(range = c(1, 7)),
+  trees(range = c(10, 1000)),
   levels = 5
 )
-```
 
-*STOP.  What is `rf_grid`?  what should it look like it you type `print(rf_grid)` *
+rf_model2 <- rand_forest(
+  mtry = tune(),
+  min_n = tune(),
+  trees = tune()) %>%  
+  set_mode("classification") %>%
+  set_engine("ranger",
+             importance = "impurity") 
 
+# Create workflow
+rf_wflow2 <- workflow() %>%
+  add_recipe(rf_recipe1) %>%
+  add_model(rf_model2)
 
-```{r}
+# Create a set of tuning parameter values to search over
+rf_grid2 <- dials::grid_regular(
+  mtry(range = c(1, 7)),
+  trees(range = c(10, 1000)),
+  min_n(range = c(5, 10)),
+  levels = 5
+)
+
 
 # Find appropriate tuning parameters
-start.time <- Sys.time()
 rf_fit <- tune_grid(
   object = rf_wflow, 
-  resamples = trees_folds, 
+  resamples = rf_folds, 
   grid = rf_grid)
-end.time <- Sys.time()
-end.time - start.time
 
-```
+rf_fit2 <- tune_grid(
+  object = rf_wflow2, 
+  resamples = rf_folds, 
+  grid = rf_grid2)
 
-We're going to use a new metric this time called the ROC-AUC. This is the Area Under the Curve for the Receiver-Operator Characteristic curve. The
-main takeaway for this metric is that it tells us how good our probability predictions are, rather than just the predictions. In classification settings, it's often preferable to the accuracy. It varies from 0 to 1, where larger is better:
-
-```{r}
 # View the ROC metric across models 
 rf_fit %>% 
   collect_metrics() %>%
   filter(.metric == "roc_auc") %>%
   select(mean, mtry, trees)
-```
 
-Now, let's finalize the workflow:
+rf_fit2 %>% 
+  collect_metrics() %>%
+  filter(.metric == "roc_auc")
 
-```{r}
 # Select the best RF model 
-best_rf_auc <- select_best(rf_fit, "roc_auc")
-#best_rf_acc <- select_best(rf_fit, "accuracy")
+rf_best_auc <- select_best(rf_fit, "roc_auc")
+rf_best_auc2 <- select_best(rf_fit2, "roc_auc")
 
-final_rf_wflow <- rf_wflow %>%
-  finalize_workflow(parameters = best_rf_auc) %>%
-  fit(data = wern_train)
+rf_wflow3 <- rf_wflow %>%
+  finalize_workflow(parameters = rf_best_auc) %>%
+  fit(data = rf_data_train)
 
-#visualize the most important features
-vip(final_rf_wflow)
-```
+rf_wflow4 <- rf_wflow2 %>%
+  finalize_workflow(parameters = rf_best_auc2) %>%
+  fit(data = rf_data_train)
 
-And evaluate the model's performance:
+vip(rf_wflow3)
+vip(rf_wflow4)
 
-```{r}
-y_hat_oos<-predict(final_rf_wflow, new_data = wern_test) |> 
+rf_OOB_1 <- predict(rf_wflow3, new_data = rf_data_test) %>%
   as_tibble()
+rf_cm_1 <- caret::confusionMatrix(data=rf_OOB_1$.pred_class, reference = rf_data_test$strike_f)
 
-caret::confusionMatrix(data=y_hat_oos$.pred_class, reference=as.factor(wern_test$union_vote))
+rf_OOB_2 <- predict(rf_wflow4, new_data = rf_data_test) %>% 
+  as_tibble()
+rf_cm_2 <- caret::confusionMatrix(data=rf_OOB_2$.pred_class, reference = rf_data_test$strike_f)
 
+print(rf_cm_1)
+print(rf_cm_2)
 ```
 
-*GROUP EXERCISE: Go back and re-run the "best" RF model, only use accuracy as the metric for the "best" model.  Compare this version of the RF to the one chosen based on ROC-AUC* 
-```{r}
+```{r Final Random Forest Model Edison}
+rf_data_train_final <- data_train %>%
+  select(-geometry)
+rf_data_test_final <- data_test %>%
+  select(-geometry)
+
+  
+rf_recipe_final <- recipe(strike_f ~ median_inc + earners + travel_work + rent +
+          assi_income + employed + poverty_rate + ba_rate, data = rf_data_train_final) %>%
+  step_impute_mean(all_predictors())
+
+rf_model_final <- rand_forest(
+  mtry = tune(),
+  min_n = tune(),
+  trees = tune()) %>%  
+  set_mode("classification") %>%
+  set_engine("ranger",
+             importance = "impurity") 
+
+# Create workflow
+rf_wflow_final <- workflow() %>%
+  add_recipe(rf_recipe_final) %>%
+  add_model(rf_model_final)
+
+# Generate cross-validation sets for tuning our model 
+rf_folds_final <- vfold_cv(rf_data_train_final, v = 10)
+
+# Create a set of tuning parameter values to search over
+rf_grid_final <- dials::grid_regular(
+  mtry(range = c(1, 7)),
+  trees(range = c(10, 1000)),
+  min_n(range = c(5, 10)),
+  levels = 5
+)
+
+# FYI it takes 7 or 8 minutes to run
+rf_fit_final <- tune_grid(
+  object = rf_wflow_final, 
+  resamples = rf_folds_final, 
+  grid = rf_grid_final)
+
+# View the ROC metric across models 
+rf_fit_final %>% 
+  collect_metrics() %>%
+  filter(.metric == "roc_auc")
+
 # Select the best RF model 
-best_acc <- select_best(rf_fit, "accuracy")
+rf_best_auc_final <- select_best(rf_fit_final, "roc_auc")
 
-final_acc_wflow <- rf_wflow %>%
-  finalize_workflow(parameters = best_acc) %>%
-  fit(data = wern_train)
+rf_wflow_best <- rf_wflow_final %>%
+  finalize_workflow(parameters = rf_best_auc_final) %>%
+  fit(data = rf_data_train_final)
 
-#visualize the most important features
-vip(final_acc_wflow)
-```
+vip(rf_wflow_best)
 
-
-```{r}
-y_hat_oos<-predict(final_acc_wflow, new_data = wern_test) |> 
+rf_OOB_final <- predict(rf_wflow_best, 
+                        new_data = rf_data_test_final) %>%
   as_tibble()
+rf_cm_final <- caret::confusionMatrix(data = rf_OOB_final$.pred_class, 
+                                      reference = rf_data_test_final$strike_f)
 
-caret::confusionMatrix(data=y_hat_oos$.pred_class, reference=as.factor(wern_test$union_vote))
-
+print(rf_cm_final)
 ```
-
-
