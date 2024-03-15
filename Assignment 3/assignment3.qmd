@@ -144,12 +144,14 @@ ACS <- ACS %>%
 
 data_train <- left_join(LAT_train, ACS, by="GEOID")
 data_train <- as.data.frame(data_train)
+# clean out redundant variables
 data_train <- data_train  %>%
   select(-ends_with(".x")) %>%
   select(-ends_with(".y"))
 
 data_test <- left_join(LAT_test, ACS, by="GEOID")
 data_test <- as.data.frame(data_test)
+# clean out redundant variables
 data_test <- data_test  %>%
   select(-ends_with(".x")) %>%
   select(-ends_with(".y"))
