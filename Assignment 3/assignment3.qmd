@@ -162,6 +162,7 @@ data_test <- data_test %>%
 
 
 
+
 ```
 
 ```{r KNN Qing}
