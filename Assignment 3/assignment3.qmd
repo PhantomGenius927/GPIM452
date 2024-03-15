@@ -14,7 +14,6 @@ library(tidycensus)
 library(tidyverse)
 library(tidymodels) # collection of packages for machine learning 
 library(kknn) # package for k-nearest neighbors models
-library(tidymodels)
 library(sf)
 ```
 
@@ -112,7 +111,6 @@ LAT_test <- LAT_test %>%
   rename(County = NAMELSAD) %>%
   select(1:10, 23, 11:22, 24, 29, 31)
 ```
-
 
 ```{r Data Cleaning--ACS}
 ACS <- ACS %>%  
@@ -516,9 +514,8 @@ autoplot(conf_mat)
 
 
 ```
+
 ```{r Random Forest}
 
 
 ```
-
-
