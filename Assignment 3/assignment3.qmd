@@ -160,307 +160,17 @@ data_test <- data_test  %>%
 
 # A new column I combine the other two labor actions into non-strike 
 data_train <- data_train %>% 
-  mutate(Strike_or_not = ifelse(`Strike or Protest`== "Strike",1,0))
+  mutate(strike = ifelse(`Strike or Protest`== "Strike",1,0))
 data_test <- data_test %>% 
-  mutate(Strike_or_not = ifelse(`Strike or Protest`== "Strike",1,0))
+  mutate(strike = ifelse(`Strike or Protest`== "Strike",1,0))
+
+# factor outcome variable
+data_test$strike_f <- as.factor(data_test$strike)
+data_train$strike_f <- as.factor(data_train$strike)
+
 
 write_csv(data_train, "Data Clean/data_train.csv")
 write_csv(data_test, "Data Clean/data_test.csv")
-
-```
-
-## KNN
-```{r KNN Qing}
-
-data_train <- data_train %>% mutate(Strike_or_not_f = as.factor(Strike_or_not))
-data_test <- data_test %>% mutate(Strike_or_not_f = as.factor(Strike_or_not))
-
-# Defining the "recipe" to preprocess the data
-
-recipe <- recipe(Strike_or_not_f ~ median_inc + earners + travel_work + rent +
-          assi_income + employed+poverty_rate+ba_rate, 
-                 data = data_train) |>
-  step_scale(all_predictors()) |> # Normalizing standard deviation to one
-  step_impute_mean(all_predictors()) # Normalizing mean to one
-
-
-# KNN Model 1
-
-model1 <- nearest_neighbor(
-  mode = "classification", # Our Y is categorical, so we use classification
-  engine = "kknn", # Engine for KNN used by tidymodels
-  neighbors = 59) # sqrt n
-
-
-# Setting up the workflow
-
-workflow1 <- workflow() |>
-  add_recipe(recipe) |>
-  add_model(model1)
-
-
-# Fitting model to training data
-
-fit1 <- workflow1 |>
-  fit(data = data_train)
-
-
-# Making predictions on the testing data
-
-preds_test <- predict(fit1, 
-                      new_data = data_test, 
-                      type = "class") # Classification
-
-# Binding the actual and predicted Y's together in data frames
-
-df_eval_test <- cbind("pop" = data_test$Strike_or_not_f, preds_test)
-
-
-# Evaluating the models with confusion matrices
-
-cm_test1 <- conf_mat(data = df_eval_test,
-                    truth = pop, 
-                    estimate = .pred_class)
-
-# Printing confusion matrices
-
-print("Confusion matrix for testing data:")
-cm_test1
-
-#-------------------------------------------------------------------------------
-
-# KNN Model 2
-
-model2 <- nearest_neighbor(
-  mode = "classification", # Our Y is categorical, so we use classification
-  engine = "kknn", # Engine for KNN used by tidymodels
-  neighbors = 29) # sqrt n/2
-
-
-# Setting up the workflow
-
-workflow2 <- workflow() |>
-  add_recipe(recipe) |>
-  add_model(model2)
-
-
-# Fitting model to training data
-
-fit2 <- workflow2 |>
-  fit(data = data_train)
-
-
-# Making predictions on the testing data
-
-preds_test <- predict(fit2, 
-                      new_data = data_test, 
-                      type = "class") # Classification
-
-# Binding the actual and predicted Y's together in data frames
-
-df_eval_test <- cbind("pop" = data_test$Strike_or_not_f, preds_test)
-
-
-# Evaluating the models with confusion matrices
-
-cm_test2 <- conf_mat(data = df_eval_test,
-                    truth = pop, 
-                    estimate = .pred_class)
-
-# Printing confusion matrices
-
-print("Confusion matrix for testing data:")
-cm_test2
-
-#-------------------------------------------------------------------------------
-
-# KNN Model 3
-
-model3 <- nearest_neighbor(
-  mode = "classification", # Our Y is categorical, so we use classification
-  engine = "kknn", # Engine for KNN used by tidymodels
-  neighbors = 119) # sqrt n*2
-
-
-# Setting up the workflow
-
-workflow3 <- workflow() |>
-  add_recipe(recipe) |>
-  add_model(model3)
-
-
-# Fitting model to training data
-
-fit3 <- workflow3 |>
-  fit(data = data_train)
-
-
-# Making predictions on the testing data
-
-preds_test <- predict(fit3, 
-                      new_data = data_test, 
-                      type = "class") # Classification
-
-# Binding the actual and predicted Y's together in data frames
-
-df_eval_test <- cbind("pop" = data_test$Strike_or_not_f, preds_test)
-
-
-# Evaluating the models with confusion matrices
-
-cm_test3 <- conf_mat(data = df_eval_test,
-                    truth = pop, 
-                    estimate = .pred_class)
-
-# Printing confusion matrices
-
-print("Confusion matrix for testing data:")
-cm_test3
-
-#-------------------------------------------------------------------------------
-
-# KNN Model 4
-
-model4 <- nearest_neighbor(
-  mode = "classification", # Our Y is categorical, so we use classification
-  engine = "kknn", # Engine for KNN used by tidymodels
-  neighbors = 89) # between model 1 and 3
-
-
-# Setting up the workflow
-
-workflow4 <- workflow() |>
-  add_recipe(recipe) |>
-  add_model(model4)
-
-
-# Fitting model to training data
-
-fit4 <- workflow4 |>
-  fit(data = data_train)
-
-
-# Making predictions on the testing data
-
-preds_test <- predict(fit4, 
-                      new_data = data_test, 
-                      type = "class") # Classification
-
-# Binding the actual and predicted Y's together in data frames
-
-df_eval_test <- cbind("pop" = data_test$Strike_or_not_f, preds_test)
-
-
-# Evaluating the models with confusion matrices
-
-cm_test4 <- conf_mat(data = df_eval_test,
-                    truth = pop, 
-                    estimate = .pred_class)
-
-# Printing confusion matrices
-
-print("Confusion matrix for testing data:")
-cm_test4
-
-#-------------------------------------------------------------------------------
-
-# KNN Model 5
-
-model5 <- nearest_neighbor(
-  mode = "classification", # Our Y is categorical, so we use classification
-  engine = "kknn", # Engine for KNN used by tidymodels
-  neighbors = 43) # between model 1 and 2
-
-
-# Setting up the workflow
-
-workflow5 <- workflow() |>
-  add_recipe(recipe) |>
-  add_model(model5)
-
-
-# Fitting model to training data
-
-fit5 <- workflow5 |>
-  fit(data = data_train)
-
-
-# Making predictions on the testing data
-
-preds_test <- predict(fit5, 
-                      new_data = data_test, 
-                      type = "class") # Classification
-
-# Binding the actual and predicted Y's together in data frames
-
-df_eval_test <- cbind("pop" = data_test$Strike_or_not_f, preds_test)
-
-
-# Evaluating the models with confusion matrices
-
-cm_test5 <- conf_mat(data = df_eval_test,
-                    truth = pop, 
-                    estimate = .pred_class)
-
-# Printing confusion matrices
-
-print("Confusion matrix for testing data:")
-cm_test5
-
-#-------------------------------------------------------------------------------
-
-# 10-fold cross-validation
-
-k <- 10
-folds_tm <- vfold_cv(data_test, v = k)
-
-
-# Fitting the models using `fit_resamples`
-
-fit_cv_tm1 <- workflow1 |>
-  fit_resamples(data = data_train,
-                resamples = folds_tm)
-
-fit_cv_tm2 <- workflow2 |>
-  fit_resamples(data = data_train,
-                resamples = folds_tm)
-
-fit_cv_tm3 <- workflow3 |>
-  fit_resamples(data = data_train,
-                resamples = folds_tm)
-
-fit_cv_tm4 <- workflow4 |>
-  fit_resamples(data = data_train,
-                resamples = folds_tm)
-
-fit_cv_tm5 <- workflow5 |>
-  fit_resamples(data = data_train,
-                resamples = folds_tm)
-
-# Collecting the mean accuracy rate for each model
-
-success_tm1 <- collect_metrics(fit_cv_tm1)$mean[1]
-success_tm2 <- collect_metrics(fit_cv_tm2)$mean[1]
-success_tm3 <- collect_metrics(fit_cv_tm3)$mean[1]
-success_tm4 <- collect_metrics(fit_cv_tm4)$mean[1]
-success_tm5 <- collect_metrics(fit_cv_tm5)$mean[1]
-
-
-# Displaying the accuracy rates
-
-paste("Model 1 accuracy:", round(success_tm1, 3))
-paste("Model 2 accuracy:", round(success_tm2, 3))
-paste("Model 3 accuracy:", round(success_tm3, 3))
-paste("Model 4 accuracy:", round(success_tm4, 3))
-paste("Model 5 accuracy:", round(success_tm5, 3))
-
-
-
-```
-
-## LASSO
-```{r LASSO}
-
 
 ```
 
@@ -469,10 +179,8 @@ paste("Model 5 accuracy:", round(success_tm5, 3))
 # I also build the log model. This is because I think LASSO implys that the relationship should be linear. However, our dependent variable is a dummy variable. In this case, it would make sense a lot to do logisitic.
 
 
-#Since run the log, our dependent variable should be a factor, so I create a new variable specifically for the factor version of "Strike_or_not"
+#Since run the log, our dependent variable should be a factor, so I create a new variable specifically for the factor version of "strike"
 
-data_test$factor_strike <- as.factor(data_test$Strike_or_not)
-data_train$factor_strike <- as.factor(data_train$Strike_or_not)
 
 # 1. Specify the Logistic Regression Model
 logistic_spec <- logistic_reg() %>% 
@@ -480,8 +188,8 @@ logistic_spec <- logistic_reg() %>%
   set_mode("classification")
 
 # 2. Prepare the Recipe
-world_recipe <- 
-  recipe(factor_strike ~ median_inc + earners + travel_work + rent +
+logistic_recipe <- 
+  recipe(strike_f ~ median_inc + earners + travel_work + rent +
           assi_income + employed+poverty_rate+ba_rate+Authorized, data = data_train) |>
   step_dummy(all_nominal(), -all_outcomes()) %>%
   step_impute_mean(all_predictors())
@@ -489,7 +197,7 @@ world_recipe <-
 # 3. Bundle the Model and Recipe into a Workflow
 logistic_workflow <- workflow() %>% 
   add_model(logistic_spec) %>% 
-  add_recipe(world_recipe)
+  add_recipe(logistic_recipe)
 
 # 4. Fit the Model to Your Training Data
 logistic_fit <- logistic_workflow %>% 
@@ -502,23 +210,409 @@ test_predictions <- logistic_fit %>%
 
 
 # To convert probabilities to binary outcome (assuming the class of interest is 1)
-test_predictions <- test_predictions %>%
-  mutate(predicted_class = .pred_class,actual_class = factor_strike)
+logistic_test_predictions <- test_predictions %>%
+  mutate(predicted_class = .pred_class,actual_class = strike_f)
 
 # 6. Evaluate the Model
-conf_mat <- conf_mat(test_predictions, truth = actual_class, estimate = predicted_class)
+logistic_conf_mat <- conf_mat(logistic_test_predictions, truth = actual_class, estimate = predicted_class)
 
 # Print the confusion matrix
-print(conf_mat)
+print(logistic_conf_mat)
 
 # Optionally, print summary metrics
-summary(conf_mat)
+summary(logistic_conf_mat)
 
 # Visualize the confusion matrix (if desired)
-autoplot(conf_mat)
-
-
+autoplot(logistic_conf_mat)
 ```
+
+
+## KNN
+```{r KNN Qing}
+# Defining the "recipe" to preprocess the data
+
+knn_recipe <- recipe(strike_f ~ median_inc + earners + travel_work + rent +
+          assi_income + employed+poverty_rate+ba_rate, 
+                 data = data_train) |>
+  step_scale(all_predictors()) |> # Normalizing standard deviation to one
+  step_impute_mean(all_predictors()) # Normalizing mean to one
+
+
+# KNN Model 1
+
+knn_model1 <- nearest_neighbor(
+  mode = "classification", # Our Y is categorical, so we use classification
+  engine = "kknn", # Engine for KNN used by tidymodels
+  neighbors = 59) # sqrt n
+
+
+# Setting up the workflow
+
+knn_workflow1 <- workflow() |>
+  add_recipe(knn_recipe) |>
+  add_model(knn_model1)
+
+
+# Fitting model to training data
+
+knn_fit1 <- knn_workflow1 |>
+  fit(data = data_train)
+
+
+# Making predictions on the testing data
+
+knn_preds_test <- predict(knn_fit1, 
+                      new_data = data_test, 
+                      type = "class") # Classification
+
+# Binding the actual and predicted Y's together in data frames
+
+knn_eval_test <- cbind("pop" = data_test$strike_f, knn_preds_test)
+
+
+# Evaluating the models with confusion matrices
+
+knn_cm_test1 <- conf_mat(data = knn_eval_test,
+                    truth = pop, 
+                    estimate = .pred_class)
+
+# Printing confusion matrices
+
+print("Confusion matrix for testing data:")
+knn_cm_test1
+
+#-------------------------------------------------------------------------------
+
+# KNN Model 2
+
+knn_model2 <- nearest_neighbor(
+  mode = "classification", # Our Y is categorical, so we use classification
+  engine = "kknn", # Engine for KNN used by tidymodels
+  neighbors = 29) # sqrt n/2
+
+
+# Setting up the workflow
+
+knn_workflow2 <- workflow() |>
+  add_recipe(knn_recipe) |>
+  add_model(knn_model2)
+
+
+# Fitting model to training data
+
+knn_fit2 <- knn_workflow2 |>
+  fit(data = data_train)
+
+
+# Making predictions on the testing data
+
+knn_preds_test2 <- predict(knn_fit2, 
+                      new_data = data_test, 
+                      type = "class") # Classification
+
+# Binding the actual and predicted Y's together in data frames
+
+knn_eval_test2 <- cbind("pop" = data_test$strike_f, knn_preds_test2)
+
+
+# Evaluating the models with confusion matrices
+
+knn_cm_test2 <- conf_mat(data = knn_eval_test2,
+                    truth = pop, 
+                    estimate = .pred_class)
+
+# Printing confusion matrices
+
+print("Confusion matrix for testing data:")
+knn_cm_test2
+
+#-------------------------------------------------------------------------------
+
+# KNN Model 3
+
+knn_model3 <- nearest_neighbor(
+  mode = "classification", # Our Y is categorical, so we use classification
+  engine = "kknn", # Engine for KNN used by tidymodels
+  neighbors = 119) # sqrt n*2
+
+
+# Setting up the workflow
+
+knn_workflow3 <- workflow() |>
+  add_recipe(knn_recipe) |>
+  add_model(knn_model3)
+
+
+# Fitting model to training data
+
+knn_fit3 <- knn_workflow3 |>
+  fit(data = data_train)
+
+
+# Making predictions on the testing data
+
+knn_preds_test3 <- predict(knn_fit3, 
+                      new_data = data_test, 
+                      type = "class") # Classification
+
+# Binding the actual and predicted Y's together in data frames
+
+knn_eval_test3 <- cbind("pop" = data_test$strike_f, knn_preds_test3)
+
+
+# Evaluating the models with confusion matrices
+
+knn_cm_test3 <- conf_mat(data = knn_eval_test3,
+                    truth = pop, 
+                    estimate = .pred_class)
+
+# Printing confusion matrices
+
+print("Confusion matrix for testing data:")
+knn_cm_test3
+
+#-------------------------------------------------------------------------------
+
+# KNN Model 4
+
+knn_model4 <- nearest_neighbor(
+  mode = "classification", # Our Y is categorical, so we use classification
+  engine = "kknn", # Engine for KNN used by tidymodels
+  neighbors = 89) # between model 1 and 3
+
+
+# Setting up the workflow
+
+knn_workflow4 <- workflow() |>
+  add_recipe(knn_recipe) |>
+  add_model(knn_model4)
+
+
+# Fitting model to training data
+
+knn_fit4 <- knn_workflow4 |>
+  fit(data = data_train)
+
+
+# Making predictions on the testing data
+
+knn_preds_test4 <- predict(knn_fit4, 
+                      new_data = data_test, 
+                      type = "class") # Classification
+
+# Binding the actual and predicted Y's together in data frames
+
+knn_eval_test4 <- cbind("pop" = data_test$strike_f, knn_preds_test4)
+
+
+# Evaluating the models with confusion matrices
+
+knn_cm_test4 <- conf_mat(data = knn_eval_test4,
+                    truth = pop, 
+                    estimate = .pred_class)
+
+# Printing confusion matrices
+
+print("Confusion matrix for testing data:")
+knn_cm_test4
+
+#-------------------------------------------------------------------------------
+
+# KNN Model 5
+
+knn_model5 <- nearest_neighbor(
+  mode = "classification", # Our Y is categorical, so we use classification
+  engine = "kknn", # Engine for KNN used by tidymodels
+  neighbors = 43) # between model 1 and 2
+
+
+# Setting up the workflow
+
+knn_workflow5 <- workflow() |>
+  add_recipe(knn_recipe) |>
+  add_model(knn_model5)
+
+
+# Fitting model to training data
+
+knn_fit5 <- knn_workflow5 |>
+  fit(data = data_train)
+
+
+# Making predictions on the testing data
+
+knn_preds_test5 <- predict(knn_fit5, 
+                      new_data = data_test, 
+                      type = "class") # Classification
+
+# Binding the actual and predicted Y's together in data frames
+
+cnn_eval_test5 <- cbind("pop" = data_test$strike_f, knn_preds_test5)
+
+
+# Evaluating the models with confusion matrices
+
+knn_cm_test5 <- conf_mat(data = cnn_eval_test5,
+                    truth = pop, 
+                    estimate = .pred_class)
+
+# Printing confusion matrices
+
+print("Confusion matrix for testing data:")
+knn_cm_test5
+
+#-------------------------------------------------------------------------------
+
+# 10-fold cross-validation
+
+k <- 10
+knn_folds_tm <- vfold_cv(data_test, v = k)
+
+
+# Fitting the models using `fit_resamples`
+
+knn_fit_cv_tm1 <- knn_workflow1 |>
+  fit_resamples(data = data_train,
+                resamples = knn_folds_tm)
+
+knn_fit_cv_tm2 <- knn_workflow2 |>
+  fit_resamples(data = data_train,
+                resamples = knn_folds_tm)
+
+knn_fit_cv_tm3 <- knn_workflow3 |>
+  fit_resamples(data = data_train,
+                resamples = knn_folds_tm)
+
+knn_fit_cv_tm4 <- knn_workflow4 |>
+  fit_resamples(data = data_train,
+                resamples = knn_folds_tm)
+
+knn_fit_cv_tm5 <- knn_workflow5 |>
+  fit_resamples(data = data_train,
+                resamples = knn_folds_tm)
+
+# Collecting the mean accuracy rate for each model
+
+knn_success_tm1 <- collect_metrics(knn_fit_cv_tm1)$mean[1]
+knn_success_tm2 <- collect_metrics(knn_fit_cv_tm2)$mean[1]
+knn_success_tm3 <- collect_metrics(knn_fit_cv_tm3)$mean[1]
+knn_success_tm4 <- collect_metrics(knn_fit_cv_tm4)$mean[1]
+knn_success_tm5 <- collect_metrics(knn_fit_cv_tm5)$mean[1]
+
+
+# Displaying the accuracy rates
+
+paste("Model 1 accuracy:", round(knn_success_tm1, 3))
+paste("Model 2 accuracy:", round(knn_success_tm2, 3))
+paste("Model 3 accuracy:", round(knn_success_tm3, 3))
+paste("Model 4 accuracy:", round(knn_success_tm4, 3))
+paste("Model 5 accuracy:", round(knn_success_tm5, 3))
+```
+
+## LASSO
+```{r LASSO Junyi}
+# Here I create LASSO through find the best penalty to train my model and create the confusion matrixs
+
+lasso_split <- initial_split(data_train, prop = 0.8, strata = strike_f)
+data_lasso_train <- training(lasso_split)
+data_lasso_test <- testing(lasso_split)
+
+lasso_world_recipe <- 
+  recipe(strike_f ~ median_inc + earners + travel_work + rent +
+          assi_income + employed+poverty_rate+ba_rate+Authorized, data = data_lasso_train) |>
+  step_dummy(all_nominal(), -all_outcomes()) %>%
+  step_impute_mean(all_predictors())
+
+lasso_wf <- workflow() |> 
+  add_recipe(lasso_world_recipe)
+
+lasso_model <- linear_reg(penalty = .1, mixture = 1) |> 
+  set_engine("glmnet")
+
+#Pick the right penalty
+lasso_tune_spec <- linear_reg(penalty = tune(), mixture = 1) |> 
+  set_engine("glmnet")
+# the sequence of penalty parameters to search over
+  penalty_grid <- tibble(
+  penalty = seq(0, 5, by = .01)
+)
+# easy way to generate folds for cross validation
+lasso_folds <- vfold_cv(data_lasso_train, v = 5)
+doParallel::registerDoParallel()
+
+
+lasso_grid <- tune_grid(
+  lasso_wf |> add_model(lasso_tune_spec),
+  resamples = lasso_folds,   # 5 fold cross validation
+  grid = penalty_grid
+)
+
+lasso_grid_metrics <- lasso_grid |>
+  collect_metrics() |>
+  print()
+
+lasso_grid_metrics |>
+  filter(.metric == "rmse") |> 
+  ggplot(aes(x = penalty, y = mean)) +
+  geom_errorbar(aes(ymin = mean - std_err, ymax = mean + std_err), 
+                alpha = 0.5) +
+  geom_line(size = 1.5) +
+  # scale_x_log10() +
+  labs(x = "Penalty", y = "RMSE")
+
+
+#Use the lowest_rmse to train the model
+lowest_rmse <- lasso_grid |>
+  select_best("rmse")
+
+final_lasso <- finalize_workflow(
+  lasso_wf |> add_model(lasso_tune_spec),
+  lowest_rmse
+)
+
+final_lasso |>
+  fit(data_lasso_train) |>
+  extract_fit_parsnip() |>
+  vip::vi(lambda = lowest_rmse$penalty) |>
+  mutate(
+    Importance = abs(Importance),
+    Variable = forcats::fct_reorder(Variable, Importance)
+  ) |>
+  filter(Importance != 0) |> 
+  ggplot(aes(x = Importance, y = Variable, fill = Sign)) +
+  geom_col() +
+  scale_x_continuous(expand = c(0, 0)) +
+  labs(y = NULL)
+
+last_fit(
+  final_lasso,
+  lasso_split
+) |> 
+  collect_metrics()
+
+
+
+#Confusion Matrix
+final_lasso_fitted <- final_lasso %>% 
+  fit(data = data_lasso_train)
+test_predictions <- predict(final_lasso_fitted, new_data = data_lasso_test) %>% 
+  bind_cols(data_lasso_test)# Binding the predictions with the actual outcomes
+
+lasso_test_predictions <- test_predictions %>%
+  mutate(predicted_class = as.factor(if_else(.pred >= 0.5, 1, 0)),
+         actual_class = as.factor(strike_f))
+
+# Create a confusion matrix
+lasso_conf_mat <- conf_mat(lasso_test_predictions, truth = actual_class, estimate = predicted_class)
+
+# Print the confusion matrix
+print(lasso_conf_mat)
+
+# For detailed evaluation metrics
+lasso_conf_mat %>%
+  summary()
+```
+
 
 ## Random Forest
 ```{r Random Forest Edison}
