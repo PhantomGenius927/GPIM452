@@ -8,9 +8,8 @@ execute:
   warning: false
   message: false
 ---
-
+git config --global user.email "you@example.com"
 ```{r Packages}
-#test
 library(tidycensus)
 library(tidyverse)
 library(tidymodels) # collection of packages for machine learning 
