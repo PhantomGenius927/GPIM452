@@ -654,10 +654,10 @@ final_lasso |>
 #----------
 
 final_lasso_fitted_test <- final_lasso %>% 
-  fit(data = data_train)
+  fit(data = data_lasso_train)
 
-test_predictions <- predict(final_lasso_fitted_test, new_data = data_test) %>% 
-  bind_cols(data_test)# Binding the predictions with the actual outcomes
+test_predictions <- predict(final_lasso_fitted_test, new_data = data_lasso_test) %>% 
+  bind_cols(data_lasso_test)# Binding the predictions with the actual outcomes
 
 lasso_new_test_predictions <- test_predictions %>%
   mutate(predicted_class = as.factor(if_else(.pred >= 0.5, 1, 0)),
@@ -677,12 +677,9 @@ lasso_new_conf_mat %>%
 ## Random Forest
 
 ```{r Random Forest Testing Edison}
-rf_split <- initial_split(data_train, prop = 0.8, strata = strike)
-rf_data_train <- training(rf_split)
-rf_data_train <- rf_data_train %>%
+rf_data_train <- data_train %>%
   select(-geometry)
-rf_data_test <- testing(rf_split)
-rf_data_test <- rf_data_test %>%
+rf_data_test <- data_test %>%
   select(-geometry)
 
 # Create recipe
