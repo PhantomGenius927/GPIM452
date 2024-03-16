@@ -10,6 +10,7 @@ execute:
 ---
 
 ```{r Packages}
+#test
 library(tidycensus)
 library(tidyverse)
 library(tidymodels) # collection of packages for machine learning 
@@ -186,12 +187,8 @@ write_csv(data_test, "Data Clean/data_test.csv")
 
 
 #Since run the log, our dependent variable should be a factor, so I create a new variable specifically for the factor version of "strike"
-logistic_split <- initial_split(data_train, prop = 0.8, strata = strike_f)
-data_logistic_train <- training(logistic_split)
-data_logistic_train <- data_logistic_train %>%
-  select(-geometry)
-data_logistic_test <- testing(logistic_split)
-data_logistic_test <- data_logistic_test %>%
+
+data_logistic_train <- data_train %>%
   select(-geometry)
 
 # 1. Specify the Logistic Regression Model
@@ -202,7 +199,7 @@ logistic_spec <- logistic_reg() %>%
 # 2. Prepare the Recipe
 logistic_recipe <- 
   recipe(strike_f ~ median_inc + earners + travel_work + rent +
-          assi_income + employed+poverty_rate+ba_rate+Authorized, data = data_logistic_train) |>
+          assi_income + employed+poverty_rate+ba_rate+Authorized, data = data_train) |>
   step_dummy(all_nominal(), -all_outcomes()) %>%
   step_impute_mean(all_predictors())
 
@@ -211,38 +208,40 @@ logistic_workflow <- workflow() %>%
   add_model(logistic_spec) %>% 
   add_recipe(logistic_recipe)
 
-# 4. Fit the Model to Your Training Data
-logistic_fit <- logistic_workflow %>% 
-  fit(data = data_logistic_train)
-
-# 5. Predict on the Test Data
-test_predictions <- logistic_fit %>% 
-  predict(new_data = data_test) %>% 
-  bind_cols(data_logistic_test)
+#----------
+# Cross-validation
+#----------
 
 
-# To convert probabilities to binary outcome (assuming the class of interest is 1)
-logistic_test_predictions <- test_predictions %>%
-  mutate(predicted_class = .pred_class,actual_class = strike_f)
+# create folds
+cv_splits_log <- vfold_cv(data_train, v = 10) # 10-fold cross-validation
 
-# 6. Evaluate the Model
-logistic_conf_mat <- conf_mat(logistic_test_predictions, truth = actual_class, estimate = predicted_class)
+# Fit the Model to Your Training Data Using Cross-Validation
 
-# Print the confusion matrix
-print(logistic_conf_mat)
+library(tune)
 
-# Optionally, print summary metrics
-summary(logistic_conf_mat)
+set.seed(123) # Set a seed for reproducibility
 
-# Visualize the confusion matrix (if desired)
-autoplot(logistic_conf_mat)
+cv_results_log <- fit_resamples(
+  logistic_workflow,
+  resamples = cv_splits_log,
+  metrics = metric_set(accuracy) # Choose your evaluation metrics
+)
+
+#Here I only select the accuracy as the metrics
+cv_summary_log <- collect_metrics(cv_results_log)
+print(cv_summary_log)
+
 
 
 #----------
-# Matrixs for LAT Test Data
+# Mectrics for LAT Test Data
 #----------
 
-test_predictions <- logistic_fit %>% 
+logistic_final_fit <- fit(logistic_workflow, data = data_train)
+
+
+test_predictions <- logistic_final_fit %>% 
   predict(new_data = data_test) %>% 
   bind_cols(data_test)
 
@@ -551,12 +550,10 @@ paste("Model 5 accuracy:", round(knn_success_tm5, 3))
 ```{r LASSO Junyi}
 # Here I create LASSO through find the best penalty to train my model and create the confusion matrixs
 
-lasso_split <- initial_split(data_train, prop = 0.8, strata = strike_f)
-data_lasso_train <- training(lasso_split)
-data_lasso_train <- data_lasso_train %>%
+
+data_lasso_train <- data_train %>%
   select(-geometry)
-data_lasso_test <- testing(lasso_split)
-data_lasso_test <- data_lasso_test %>%
+data_lasso_test <- data_test %>%
   select(-geometry)
 
 lasso_world_recipe <- 
@@ -578,16 +575,46 @@ lasso_tune_spec <- linear_reg(penalty = tune(), mixture = 1) |>
   penalty_grid <- tibble(
   penalty = seq(0, 5, by = .01)
 )
+
+#----------
+# Cross-validation for accuracy
+#----------
+
 # easy way to generate folds for cross validation
-lasso_folds <- vfold_cv(data_lasso_train, v = 5)
+lasso_folds <- vfold_cv(data_lasso_train, v = 10)
 doParallel::registerDoParallel()
 
 
 lasso_grid <- tune_grid(
   lasso_wf |> add_model(lasso_tune_spec),
-  resamples = lasso_folds,   # 5 fold cross validation
+  resamples = lasso_folds,   # 10 fold cross validation
   grid = penalty_grid
 )
+
+#lasso_grid_metrics <- lasso_grid |>
+#  collect_metrics() |>
+#  print()
+
+
+lasso_results <- lasso_grid %>%
+  collect_metrics() 
+
+best_accuracy <- lasso_results %>%
+  filter(.metric == "accuracy") %>%
+  arrange(desc(mean)) %>%
+  slice(1) %>%
+  pull(penalty)
+
+final_lasso <- finalize_workflow(
+  lasso_wf |> add_model(lasso_model),
+  list(penalty = best_accuracy)
+)
+
+print(best_accuracy)
+
+#----------
+# Cross-validation for lowest rmse
+#----------
 
 lasso_grid_metrics <- lasso_grid |>
   collect_metrics() |>
@@ -600,7 +627,7 @@ lasso_grid_metrics |>
                 alpha = 0.5) +
   geom_line(size = 1.5) +
   # scale_x_log10() +
-  labs(x = "Penalty", y = "RMSE")
+  labs(x = "Penalty", y = "accuracy")
 
 
 #Use the lowest_rmse to train the model
@@ -626,40 +653,13 @@ final_lasso |>
   scale_x_continuous(expand = c(0, 0)) +
   labs(y = NULL)
 
-last_fit(
-  final_lasso,
-  lasso_split
-) |> 
-  collect_metrics()
-
-
-
-#Confusion Matrix
-final_lasso_fitted <- final_lasso %>% 
-  fit(data = data_lasso_train)
-test_predictions <- predict(final_lasso_fitted, new_data = data_lasso_test) %>% 
-  bind_cols(data_lasso_test)# Binding the predictions with the actual outcomes
-
-lasso_test_predictions <- test_predictions %>%
-  mutate(predicted_class = as.factor(if_else(.pred >= 0.5, 1, 0)),
-         actual_class = as.factor(strike_f))
-
-# Create a confusion matrix
-lasso_conf_mat <- conf_mat(lasso_test_predictions, truth = actual_class, estimate = predicted_class)
-
-# Print the confusion matrix
-print(lasso_conf_mat)
-
-# For detailed evaluation metrics
-lasso_conf_mat %>%
-  summary()
 
 #----------
-# Matrixs for LAT Test Data
+# Matrixs for LAT Test Data for the lowest rmse
 #----------
 
 final_lasso_fitted_test <- final_lasso %>% 
-  fit(data = data_lasso_train)
+  fit(data = data_train)
 
 test_predictions <- predict(final_lasso_fitted_test, new_data = data_test) %>% 
   bind_cols(data_test)# Binding the predictions with the actual outcomes
