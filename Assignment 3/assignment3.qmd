@@ -684,4 +684,7 @@ rf_cm_2 <- caret::confusionMatrix(data=rf_OOB_2$.pred_class, reference = data_te
 
 print(rf_cm_1)
 print(rf_cm_2)
+
+gg_dta <- gg_roc(rf_wflow4, which.outcome=2)
+plot(gg_dta)
 ```
