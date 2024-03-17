@@ -176,6 +176,11 @@ data_test <- data_test %>%
 data_test$strike_f <- as.factor(data_test$strike)
 data_train$strike_f <- as.factor(data_train$strike)
 
+data_train <- data_train %>%
+  select(-geometry)
+data_test <- data_test %>%
+  select(-geometry)
+
 
 write_csv(data_train, "Data Clean/data_train.csv")
 write_csv(data_test, "Data Clean/data_test.csv")
@@ -189,9 +194,6 @@ write_csv(data_test, "Data Clean/data_test.csv")
 
 #Since run the log, our dependent variable should be a factor, so I create a new variable specifically for the factor version of "strike"
 
-data_logistic_train <- data_train %>%
-  select(-geometry)
-
 # 1. Specify the Logistic Regression Model
 logistic_spec <- logistic_reg() %>% 
   set_engine("glm") %>% 
@@ -200,7 +202,7 @@ logistic_spec <- logistic_reg() %>%
 # 2. Prepare the Recipe
 logistic_recipe <- 
   recipe(strike_f ~ median_inc + earners + travel_work + rent +
-          assi_income + employed+poverty_rate+ba_rate, data = data_logistic_train) |>
+          assi_income + employed+poverty_rate+ba_rate, data = data_train) |>
   step_dummy(all_nominal(), -all_outcomes()) %>%
   step_impute_mean(all_predictors())
 
@@ -261,6 +263,8 @@ autoplot(logistic_test_conf_mat)
 ## KNN
 
 ```{r KNN Qing}
+
+
 # Defining the "recipe" to preprocess the data
 
 knn_recipe <- recipe(strike_f ~ median_inc + earners + travel_work + rent +
@@ -410,7 +414,7 @@ knn_fit_cv_tm5 <- knn_workflow5 |>
   fit_resamples(data = data_train,
                 resamples = knn_folds_tm)
 
-# Collecting the mean accuracy rate for each model
+# Collecting the mean ROC_AUC accuracy rate for each model
 
 knn_success_tm1 <- collect_metrics(knn_fit_cv_tm1)$mean[2]
 knn_success_tm2 <- collect_metrics(knn_fit_cv_tm2)$mean[2]
@@ -456,16 +460,9 @@ knn_cm_test5
 
 ```{r LASSO Junyi}
 # Here I create LASSO through find the best penalty to train my model and create the confusion matrixs
-
-
-data_lasso_train <- data_train %>%
-  select(-geometry)
-data_lasso_test <- data_test %>%
-  select(-geometry)
-
 lasso_world_recipe <- 
   recipe(strike ~ median_inc + earners + travel_work + rent +
-          assi_income + employed+poverty_rate+ba_rate, data = data_lasso_train) |>
+          assi_income + employed+poverty_rate+ba_rate, data = data_train) |>
   step_dummy(all_nominal(), -all_outcomes()) %>%
   step_impute_mean(all_predictors())
 
@@ -488,7 +485,7 @@ lasso_tune_spec <- linear_reg(penalty = tune(), mixture = 1) |>
 #----------
 
 # easy way to generate folds for cross validation
-lasso_folds <- vfold_cv(data_lasso_train, v = 10)
+lasso_folds <- vfold_cv(data_train, v = 10)
 doParallel::registerDoParallel()
 
 
@@ -547,7 +544,7 @@ final_lasso <- finalize_workflow(
 )
 
 final_lasso |>
-  fit(data_lasso_train) |>
+  fit(data_train) |>
   extract_fit_parsnip() |>
   vip::vi(lambda = lowest_rmse$penalty) |>
   mutate(
@@ -566,10 +563,10 @@ final_lasso |>
 #----------
 
 final_lasso_fitted_test <- final_lasso %>% 
-  fit(data = data_lasso_train)
+  fit(data = data_train)
 
-test_predictions <- predict(final_lasso_fitted_test, new_data = data_lasso_test) %>% 
-  bind_cols(data_lasso_test)# Binding the predictions with the actual outcomes
+test_predictions <- predict(final_lasso_fitted_test, new_data = data_test) %>% 
+  bind_cols(data_test)# Binding the predictions with the actual outcomes
 
 lasso_new_test_predictions <- test_predictions %>%
   mutate(predicted_class = as.factor(if_else(.pred >= 0.5, 1, 0)),
@@ -589,14 +586,9 @@ lasso_new_conf_mat %>%
 ## Random Forest
 
 ```{r Random Forest Edison}
-rf_data_train <- data_train %>%
-  select(-geometry)
-rf_data_test <- data_test %>%
-  select(-geometry)
-
 # Create recipe
 rf_recipe1 <- recipe(strike_f ~ median_inc + earners + travel_work + rent +
-          assi_income + employed + poverty_rate + ba_rate, data = rf_data_train) %>%
+          assi_income + employed + poverty_rate + ba_rate, data = data_train) %>%
   step_impute_mean(all_predictors())
 
 rf_model <- rand_forest(
@@ -614,7 +606,7 @@ rf_wflow <- workflow() %>%
 
 
 # Generate cross-validation sets for tuning our model 
-rf_folds <- vfold_cv(rf_data_train, v = 10)
+rf_folds <- vfold_cv(data_train, v = 10)
 
 # Create a set of tuning parameter values to search over
 rf_grid <- dials::grid_regular(
@@ -673,23 +665,26 @@ rf_best_auc2 <- select_best(rf_fit2, "roc_auc")
 
 rf_wflow3 <- rf_wflow %>%
   finalize_workflow(parameters = rf_best_auc) %>%
-  fit(data = rf_data_train)
+  fit(data = data_train)
 
 rf_wflow4 <- rf_wflow2 %>%
   finalize_workflow(parameters = rf_best_auc2) %>%
-  fit(data = rf_data_train)
+  fit(data = data_train)
 
 vip(rf_wflow3)
 vip(rf_wflow4)
 
-rf_OOB_1 <- predict(rf_wflow3, new_data = rf_data_test) %>%
+rf_OOB_1 <- predict(rf_wflow3, new_data = data_test) %>%
   as_tibble()
-rf_cm_1 <- caret::confusionMatrix(data=rf_OOB_1$.pred_class, reference = rf_data_test$strike_f)
+rf_cm_1 <- caret::confusionMatrix(data=rf_OOB_1$.pred_class, reference = data_test$strike_f)
 
-rf_OOB_2 <- predict(rf_wflow4, new_data = rf_data_test) %>% 
+rf_OOB_2 <- predict(rf_wflow4, new_data = data_test) %>% 
   as_tibble()
-rf_cm_2 <- caret::confusionMatrix(data=rf_OOB_2$.pred_class, reference = rf_data_test$strike_f)
+rf_cm_2 <- caret::confusionMatrix(data=rf_OOB_2$.pred_class, reference = data_test$strike_f)
 
 print(rf_cm_1)
 print(rf_cm_2)
+
+gg_dta <- gg_roc(rf_wflow4, which.outcome=2)
+plot(gg_dta)
 ```
