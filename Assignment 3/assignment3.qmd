@@ -290,27 +290,7 @@ knn_fit1 <- knn_workflow1 |>
   fit(data = data_train)
 
 
-# Making predictions on the testing data
 
-knn_preds_test <- predict(knn_fit1, 
-                      new_data = data_test, 
-                      type = "class") # Classification
-
-# Binding the actual and predicted Y's together in data frames
-
-knn_eval_test <- cbind("pop" = data_test$strike_f, knn_preds_test)
-
-
-# Evaluating the models with confusion matrices
-
-knn_cm_test1 <- conf_mat(data = knn_eval_test,
-                    truth = pop, 
-                    estimate = .pred_class)
-
-# Printing confusion matrices
-
-print("Confusion matrix for testing data:")
-knn_cm_test1
 
 #-------------------------------------------------------------------------------
 
@@ -334,29 +314,6 @@ knn_workflow2 <- workflow() |>
 knn_fit2 <- knn_workflow2 |>
   fit(data = data_train)
 
-
-# Making predictions on the testing data
-
-knn_preds_test2 <- predict(knn_fit2, 
-                      new_data = data_test, 
-                      type = "class") # Classification
-
-# Binding the actual and predicted Y's together in data frames
-
-knn_eval_test2 <- cbind("pop" = data_test$strike_f, knn_preds_test2)
-
-
-# Evaluating the models with confusion matrices
-
-knn_cm_test2 <- conf_mat(data = knn_eval_test2,
-                    truth = pop, 
-                    estimate = .pred_class)
-
-# Printing confusion matrices
-
-print("Confusion matrix for testing data:")
-knn_cm_test2
-
 #-------------------------------------------------------------------------------
 
 # KNN Model 3
@@ -379,29 +336,6 @@ knn_workflow3 <- workflow() |>
 knn_fit3 <- knn_workflow3 |>
   fit(data = data_train)
 
-
-# Making predictions on the testing data
-
-knn_preds_test3 <- predict(knn_fit3, 
-                      new_data = data_test, 
-                      type = "class") # Classification
-
-# Binding the actual and predicted Y's together in data frames
-
-knn_eval_test3 <- cbind("pop" = data_test$strike_f, knn_preds_test3)
-
-
-# Evaluating the models with confusion matrices
-
-knn_cm_test3 <- conf_mat(data = knn_eval_test3,
-                    truth = pop, 
-                    estimate = .pred_class)
-
-# Printing confusion matrices
-
-print("Confusion matrix for testing data:")
-knn_cm_test3
-
 #-------------------------------------------------------------------------------
 
 # KNN Model 4
@@ -418,34 +352,10 @@ knn_workflow4 <- workflow() |>
   add_recipe(knn_recipe) |>
   add_model(knn_model4)
 
-
 # Fitting model to training data
 
 knn_fit4 <- knn_workflow4 |>
   fit(data = data_train)
-
-
-# Making predictions on the testing data
-
-knn_preds_test4 <- predict(knn_fit4, 
-                      new_data = data_test, 
-                      type = "class") # Classification
-
-# Binding the actual and predicted Y's together in data frames
-
-knn_eval_test4 <- cbind("pop" = data_test$strike_f, knn_preds_test4)
-
-
-# Evaluating the models with confusion matrices
-
-knn_cm_test4 <- conf_mat(data = knn_eval_test4,
-                    truth = pop, 
-                    estimate = .pred_class)
-
-# Printing confusion matrices
-
-print("Confusion matrix for testing data:")
-knn_cm_test4
 
 #-------------------------------------------------------------------------------
 
@@ -469,35 +379,11 @@ knn_workflow5 <- workflow() |>
 knn_fit5 <- knn_workflow5 |>
   fit(data = data_train)
 
-
-# Making predictions on the testing data
-
-knn_preds_test5 <- predict(knn_fit5, 
-                      new_data = data_test, 
-                      type = "class") # Classification
-
-# Binding the actual and predicted Y's together in data frames
-
-cnn_eval_test5 <- cbind("pop" = data_test$strike_f, knn_preds_test5)
-
-
-# Evaluating the models with confusion matrices
-
-knn_cm_test5 <- conf_mat(data = cnn_eval_test5,
-                    truth = pop, 
-                    estimate = .pred_class)
-
-# Printing confusion matrices
-
-print("Confusion matrix for testing data:")
-knn_cm_test5
-
 #-------------------------------------------------------------------------------
 
 # 10-fold cross-validation
 
-k <- 10
-knn_folds_tm <- vfold_cv(data_test, v = k)
+knn_folds_tm <- vfold_cv(data_train, v = 10)
 
 
 # Fitting the models using `fit_resamples`
@@ -538,6 +424,30 @@ paste("Model 2 accuracy:", round(knn_success_tm2, 3))
 paste("Model 3 accuracy:", round(knn_success_tm3, 3))
 paste("Model 4 accuracy:", round(knn_success_tm4, 3))
 paste("Model 5 accuracy:", round(knn_success_tm5, 3))
+
+
+# Making predictions on the testing data using Model 5
+
+knn_preds_test5 <- predict(knn_fit5, 
+                      new_data = data_test, 
+                      type = "class") # Classification
+
+# Binding the actual and predicted Y's together in data frames
+
+knn_eval_test5 <- cbind("pop" = data_test$strike_f, knn_preds_test)
+
+
+# Evaluating the models with confusion matrices
+
+knn_cm_test5 <- conf_mat(data = knn_eval_test,
+                    truth = pop, 
+                    estimate = .pred_class)
+
+# Printing confusion matrices
+
+print("Confusion matrix for testing data:")
+knn_cm_test5
+
 ```
 
 ## LASSO
