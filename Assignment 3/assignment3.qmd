@@ -414,7 +414,7 @@ knn_fit_cv_tm5 <- knn_workflow5 |>
   fit_resamples(data = data_train,
                 resamples = knn_folds_tm)
 
-# Collecting the mean ROC_AUC rate for each model
+# Collecting the mean accuracy rate for each model
 
 knn_success_tm1 <- collect_metrics(knn_fit_cv_tm1)$mean[2]
 knn_success_tm2 <- collect_metrics(knn_fit_cv_tm2)$mean[2]
@@ -657,6 +657,7 @@ rf_fit %>%
 rf_fit2 %>% 
   collect_metrics() %>%
   filter(.metric == "roc_auc")
+print(rf_fit2)
 
 # Select the best RF model 
 rf_best_auc <- select_best(rf_fit, "roc_auc")
