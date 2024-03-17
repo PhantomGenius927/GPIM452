@@ -220,7 +220,7 @@ cv_splits_log <- vfold_cv(data_train, v = 10) # 10-fold cross-validation
 cv_results_log <- fit_resamples(
   logistic_workflow,
   resamples = cv_splits_log,
-  metrics = metric_set(accuracy) # Choose your evaluation metrics
+  metrics = metric_set(roc_auc) # Choose your evaluation metrics
 )
 
 #Here I only select the accuracy as the metrics
@@ -409,13 +409,13 @@ knn_fit_cv_tm5 <- knn_workflow5 |>
   fit_resamples(data = data_train,
                 resamples = knn_folds_tm)
 
-# Collecting the mean accuracy rate for each model
+# Collecting the mean ROC_AUC rate for each model
 
-knn_success_tm1 <- collect_metrics(knn_fit_cv_tm1)$mean[1]
-knn_success_tm2 <- collect_metrics(knn_fit_cv_tm2)$mean[1]
-knn_success_tm3 <- collect_metrics(knn_fit_cv_tm3)$mean[1]
-knn_success_tm4 <- collect_metrics(knn_fit_cv_tm4)$mean[1]
-knn_success_tm5 <- collect_metrics(knn_fit_cv_tm5)$mean[1]
+knn_success_tm1 <- collect_metrics(knn_fit_cv_tm1)$mean[2]
+knn_success_tm2 <- collect_metrics(knn_fit_cv_tm2)$mean[2]
+knn_success_tm3 <- collect_metrics(knn_fit_cv_tm3)$mean[2]
+knn_success_tm4 <- collect_metrics(knn_fit_cv_tm4)$mean[2]
+knn_success_tm5 <- collect_metrics(knn_fit_cv_tm5)$mean[2]
 
 
 # Displaying the accuracy rates
@@ -506,7 +506,7 @@ lasso_results <- lasso_grid %>%
   collect_metrics() 
 
 best_accuracy <- lasso_results %>%
-  filter(.metric == "accuracy") %>%
+  filter(.metric == "roc_auc") %>%
   arrange(desc(mean)) %>%
   slice(1) %>%
   pull(penalty)
