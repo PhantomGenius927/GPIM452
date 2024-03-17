@@ -676,7 +676,7 @@ lasso_new_conf_mat %>%
 
 ## Random Forest
 
-```{r Random Forest Testing Edison}
+```{r Random Forest Edison}
 rf_data_train <- data_train %>%
   select(-geometry)
 rf_data_test <- data_test %>%
@@ -706,7 +706,7 @@ rf_folds <- vfold_cv(rf_data_train, v = 10)
 
 # Create a set of tuning parameter values to search over
 rf_grid <- dials::grid_regular(
-  mtry(range = c(1, 7)),
+  mtry(range = c(1, 8)),
   trees(range = c(10, 1000)),
   levels = 5
 )
@@ -726,7 +726,7 @@ rf_wflow2 <- workflow() %>%
 
 # Create a set of tuning parameter values to search over
 rf_grid2 <- dials::grid_regular(
-  mtry(range = c(1, 7)),
+  mtry(range = c(1, 8)),
   trees(range = c(10, 1000)),
   min_n(range = c(5, 10)),
   levels = 5
@@ -753,7 +753,7 @@ rf_fit %>%
 rf_fit2 %>% 
   collect_metrics() %>%
   filter(.metric == "roc_auc")
-
+print(rf_fit2)
 # Select the best RF model 
 rf_best_auc <- select_best(rf_fit, "roc_auc")
 rf_best_auc2 <- select_best(rf_fit2, "roc_auc")
@@ -779,68 +779,4 @@ rf_cm_2 <- caret::confusionMatrix(data=rf_OOB_2$.pred_class, reference = rf_data
 
 print(rf_cm_1)
 print(rf_cm_2)
-```
-
-```{r Final Random Forest Model Edison}
-rf_data_train_final <- data_train %>%
-  select(-geometry)
-rf_data_test_final <- data_test %>%
-  select(-geometry)
-
-  
-rf_recipe_final <- recipe(strike_f ~ median_inc + earners + travel_work + rent +
-          assi_income + employed + poverty_rate + ba_rate, data = rf_data_train_final) %>%
-  step_impute_mean(all_predictors())
-
-rf_model_final <- rand_forest(
-  mtry = tune(),
-  min_n = tune(),
-  trees = tune()) %>%  
-  set_mode("classification") %>%
-  set_engine("ranger",
-             importance = "impurity") 
-
-# Create workflow
-rf_wflow_final <- workflow() %>%
-  add_recipe(rf_recipe_final) %>%
-  add_model(rf_model_final)
-
-# Generate cross-validation sets for tuning our model 
-rf_folds_final <- vfold_cv(rf_data_train_final, v = 10)
-
-# Create a set of tuning parameter values to search over
-rf_grid_final <- dials::grid_regular(
-  mtry(range = c(1, 7)),
-  trees(range = c(10, 1000)),
-  min_n(range = c(5, 10)),
-  levels = 5
-)
-
-# FYI it takes 7 or 8 minutes to run
-rf_fit_final <- tune_grid(
-  object = rf_wflow_final, 
-  resamples = rf_folds_final, 
-  grid = rf_grid_final)
-
-# View the ROC metric across models 
-rf_fit_final %>% 
-  collect_metrics() %>%
-  filter(.metric == "roc_auc")
-
-# Select the best RF model 
-rf_best_auc_final <- select_best(rf_fit_final, "roc_auc")
-
-rf_wflow_best <- rf_wflow_final %>%
-  finalize_workflow(parameters = rf_best_auc_final) %>%
-  fit(data = rf_data_train_final)
-
-vip(rf_wflow_best)
-
-rf_OOB_final <- predict(rf_wflow_best, 
-                        new_data = rf_data_test_final) %>%
-  as_tibble()
-rf_cm_final <- caret::confusionMatrix(data = rf_OOB_final$.pred_class, 
-                                      reference = rf_data_test_final$strike_f)
-
-print(rf_cm_final)
 ```
