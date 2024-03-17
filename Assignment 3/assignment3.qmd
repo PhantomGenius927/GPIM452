@@ -37,7 +37,7 @@ vars <- c(
   "B17001_001E", # total_pop
   "B17001_002E" # below_poverty
   )
-
+# API Keys: 8f18e1531b731fb432dd5a9657d8ee937a0290da
 ACS <- get_acs(geography = "county", 
                     variables = vars, 
                     year = 2022,
