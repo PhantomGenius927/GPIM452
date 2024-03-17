@@ -664,7 +664,7 @@ rf_fit %>%
 rf_fit2 %>% 
   collect_metrics() %>%
   filter(.metric == "roc_auc")
-print(rf_fit2)
+
 # Select the best RF model 
 rf_best_auc <- select_best(rf_fit, "roc_auc")
 rf_best_auc2 <- select_best(rf_fit2, "roc_auc")
