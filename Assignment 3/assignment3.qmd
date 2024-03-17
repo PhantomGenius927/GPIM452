@@ -19,6 +19,7 @@ library(rpart)
 library(ranger)
 library(vip)
 library(tune)
+library(ggRandomForests)
 
 # setting randomization parameter
 set.seed(315)
