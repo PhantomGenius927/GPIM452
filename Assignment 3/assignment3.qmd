@@ -265,8 +265,9 @@ autoplot(logistic_test_conf_mat)
 knn_recipe <- recipe(strike_f ~ median_inc + earners + travel_work + rent +
           assi_income + employed+poverty_rate+ba_rate, 
                  data = data_train) |>
+  step_impute_mean(all_predictors()) |>
   step_scale(all_predictors()) |> # Normalizing standard deviation to one
-  step_impute_mean(all_predictors()) # Normalizing mean to one
+  step_center(all_predictors())# Normalizing mean to one
 
 
 # KNN Model 1
@@ -434,12 +435,12 @@ knn_preds_test5 <- predict(knn_fit5,
 
 # Binding the actual and predicted Y's together in data frames
 
-knn_eval_test5 <- cbind("pop" = data_test$strike_f, knn_preds_test)
+knn_eval_test5 <- cbind("pop" = data_test$strike_f, knn_preds_test5)
 
 
 # Evaluating the models with confusion matrices
 
-knn_cm_test5 <- conf_mat(data = knn_eval_test,
+knn_cm_test5 <- conf_mat(data = knn_eval_test5,
                     truth = pop, 
                     estimate = .pred_class)
 
