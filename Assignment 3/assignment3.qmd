@@ -259,8 +259,10 @@ summary(logistic_test_conf_mat)
 ```{r echo=FALSE, results='hide'}
 testlog <- summary(logistic_test_conf_mat) %>% slice(1)
 testlog <- testlog[,-c(1:2)]
+colnames(testlog) <- c("Logistic")
 tablog <- testlog %>% tt(digits = 3)
-colnames(tablog) <- c("Logistic")
+tablog
+
 ```
 
 ```{r echo=FALSE, results='hide'}
@@ -473,9 +475,9 @@ summary(knn_cm_test5)
 ```{r echo=FALSE, results='hide'}
 testknn <- summary(knn_cm_test5) %>% slice(1)
 testknn <- testknn[,-c(1:2)]
-#testknn$Accuracy <- testknn$.estimate
+colnames(testknn) <- c("KNN")
 tabknn <- testknn %>% tt(digits = 3)
-colnames(tabknn) <- c("KNN")
+tabknn
 ```
 
 ```{r echo=FALSE, results='hide'}
@@ -611,8 +613,9 @@ lasso_new_conf_mat %>%
 testlasso <- lasso_new_conf_mat %>%
                   summary() %>% slice(1)
 testlasso <- testlasso[,-c(1:2)]
+colnames(testlasso) <- c("Lasso")
 tablasso <- testlasso %>% tt(digits = 3)
-colnames(tablasso) <- c("Lasso")
+tablasso
 ```
 
 ```{r echo=FALSE, results='hide'}
@@ -726,6 +729,7 @@ rf_cm_2 <- caret::confusionMatrix(data=rf_OOB_2$.pred_class, reference = data_te
 
 tabrf <- rf_cm_2[["overall"]][["Accuracy"]] %>% as.data.frame() %>% tt(digits = 3)
 colnames(tabrf) <- c("Random Forest")
+tabrf
 ```
 
 # Introduction
@@ -741,7 +745,7 @@ tottab <- cross_join(tablog, tabknn)
 tottab <- cross_join(tottab, tablasso) 
 tottab <- cross_join(tottab, tabrf)
 cat("Table 1: Accuracy of Each Model (% of correct predictions)")
-print(tottab)
+tottab
 ```
 
 Furthermore, as mentioned earlier, this decision was made because when predicting labor actions, it's crucial to prioritize accuracy above all other evaluation metrics. To explain, the cost of failing to predict most labor actions correctly is likely higher than the cost of having more false positives or false negatives. In other words, the KNN model that selects 43 neighbors was chosen because it had the highest recorded accuracy in predicting labor actions based on the testing data set, making it the most cost-minimizing option for any real-world applications.
@@ -770,9 +774,9 @@ First, it is important to note that not all of the variables present in the "new
 
 The prediction model had the predicted variable *strike_f* (categorical variable for strike or non-strike as \[1\] or \[0\] ) on the left hand side and the aforementioned eight variables on the right hand side. All predictor variables are normalized. Then, five different KNN models are made using the following values for *k* (nearest neighbors): square root of $n=59$, square root of $n/2=29$, square root of $2*n=119$, halfway between the the square root of n and square root of $2*n=89$, and halfway between square root of n and square root of $n/2=43$, with n as the number of observations. Choosing such diverse *k* values, and points in between, for KNN model development can help identify the optimal balance between sensitivity to local data structures and generalization ability, aiming to enhance model accuracy by exploring a range of model complexities. This approach can help find a *k* that minimizes bias and variance, which is critical for achieving the best predictive performance.
 
-Then, workflows were set up and 5 KNN models (with unique *k* values) were fitted to LAT training data. 10-fold cross validation was used to resample each of the 5 KNN models, and model number 5 ($k=43$) had the highest mean accuracy rate. 
+Then, workflows were set up and 5 KNN models (with unique *k* values) were fitted to LAT training data. 10-fold cross validation was used to resample each of the 5 KNN models, and model number 5 ($k=43$) had the highest mean accuracy rate.
 
-KNN model number 5 in the validation data set performed almost equally as well as it did with the test set, having an accuracy rate of $57.9\%$ and $58.01\%$ respectively. The little change in accuracy from the cross validation to the test data set indicates a high probability of it being unlikely that the current model is overfit to the training data set, strengthening the validity of the models prediction capabilities. Additionally, it is important to note that KNN models do not offer any indication of which predictor variables were most important in determining the prediction accuracy. 
+KNN model number 5 in the validation data set performed almost equally as well as it did with the test set, having an accuracy rate of $57.9\%$ and $58.01\%$ respectively. The little change in accuracy from the cross validation to the test data set indicates a high probability of it being unlikely that the current model is overfit to the training data set, strengthening the validity of the models prediction capabilities. Additionally, it is important to note that KNN models do not offer any indication of which predictor variables were most important in determining the prediction accuracy.
 
 ```{r echo=FALSE}
 library(ggplot2)
@@ -783,7 +787,7 @@ knn_cm_test5_accuracy_value <- knn_cm_test5_accuracy %>%
   pull(.estimate)
 
 # Step 1: Create a data frame of accuracy rates
-model_names <- c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5","Model 5 in Test Data")
+model_names <- c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5","M5 in Test Data")
 accuracy_rates <- c(knn_success_tm1, knn_success_tm2, knn_success_tm3, knn_success_tm4, knn_success_tm5, knn_cm_test5_accuracy_value)
 
 # Round the accuracy rates to two decimal places before creating the plot
