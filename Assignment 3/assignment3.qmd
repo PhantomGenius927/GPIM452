@@ -232,7 +232,7 @@ cv_splits_log <- vfold_cv(data_train, v = 10) # 10-fold cross-validation
 cv_results_log <- fit_resamples(
   logistic_workflow,
   resamples = cv_splits_log,
-  metrics = metric_set(roc_auc) # Choose your evaluation metrics
+  metrics = metric_set(accuracy) # Choose your evaluation metrics
 )
 
 #Here I only select the accuracy as the metrics
