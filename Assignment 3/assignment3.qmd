@@ -731,9 +731,9 @@ testrf <- rf_cm_2[["overall"]][["Accuracy"]] %>%
   as.data.frame() 
 colnames(testrf) <- c("Random Forest")
 testrf
-tabrf <- tabrf %>%  
-  tt(digits = 3)
-tabrf
+#tabrf <- tabrf %>%  
+ # tt(digits = 3)
+#tabrf
 ```
 
 # Introduction
