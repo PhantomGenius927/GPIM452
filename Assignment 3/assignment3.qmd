@@ -744,7 +744,7 @@ Our logistical regression provides $55.4\%$ accuracy in predicting labor action 
 
 The K-nearest neighbors (KNN) model number 5 selecting 43 neighbors was chosen as the final model to predict labor actions. The goal of this project is to predict labor actions as accurately as possible. Seeing that the KNN model was the most accurate of all the models tested, at a $58\%$ accuracy rate, it was chosen over all other models. *(see table 1)*
 
-```{r echo = FALSE,warning=FALSE}
+```{r echo = FALSE, warning=FALSE}
 #tottab <- cross_join(tablog, tabknn)
 #tottab <- cross_join(tottab, tablasso) 
 #tottab <- cross_join(tottab, tabrf)
@@ -824,7 +824,7 @@ ggplot(accuracy_data, aes(x = Model, y = Accuracy, fill = Model)) +
             color = "black") +
   theme_minimal() +
   labs(title = "KNN Models Accuracy Rates in Validation Set and Test Data", 
-       x = "Model", y = "Accuracy Rate") +
+       x = NULL, y = "Accuracy Rate") +
   scale_fill_brewer(palette = "Pastel1")
 ```
 
