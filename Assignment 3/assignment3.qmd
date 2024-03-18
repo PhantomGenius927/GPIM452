@@ -1,6 +1,6 @@
 ---
 title: "Assignment 3"
-author: "Group 2"
+author: "Group 2: Edison Hu, Qing Yin, Junyi Hua, GianCarlo Samayoa"
 format: pdf
 editor: visual
 date: Mar 18 2024
@@ -9,7 +9,9 @@ execute:
   message: false
 ---
 
-```{r Packages}
+## Introduction
+In this project our group 
+```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
 library(tidycensus)
 library(tidyverse)
 library(tidymodels) # collection of packages for machine learning 
@@ -25,7 +27,7 @@ library(ggRandomForests)
 set.seed(315)
 ```
 
-```{r Define Data variable name}
+```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
 vars <- c(
   "B06011_001E", # mean income
   "B19122_001E", # household earner
@@ -50,9 +52,9 @@ LAT_train <- readxl::read_xlsx("Data Raw/Labor action tracker data 12.4.23.xlsx"
 LAT_test <- readxl::read_xlsx("Data Raw/Labor action tracker data 2.26.24.xlsx")
 ```
 
-## Data Cleaning--LAT
+## Data Cleaning--LAT Junyi & Edison
 
-```{r Data Cleaning--LAT Junyi & Edison, output=FALSE}
+```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
 county <- tigris::counties(cb = TRUE)
 #----------
 # LAT Train Data
@@ -125,7 +127,7 @@ LAT_test <- LAT_test %>%
 
 ## Data Cleaning--ACS
 
-```{r Data Cleaning--ACS Junyi & Edison, output=FALSE}
+```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
 ACS <- ACS %>%  
   select(GEOID, ends_with("E")) %>%
   separate(col = "NAME", into = c("County", "State"), sep = ",") %>%
@@ -149,7 +151,7 @@ ACS <- ACS %>%
 
 ## Training Data and Test Data
 
-```{r Training & Testing Data Junyi & Edison, output=FALSE}
+```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
 #Here is the final data set with all acs variables and the LAT data
 #Since around 90% of the duration was NAs, so I did not unify the time into a new column.
 
@@ -189,7 +191,9 @@ write_csv(data_test, "Data Clean/data_test.csv")
 
 ## Logit
 
-```{r LOGSTIC Junyi}
+```{r message = FALSE, error=FALSE, warning=FALSE}
+#, results='hide'}
+
 # I also build the log model. This is because I think LASSO implys that the relationship should be linear. However, our dependent variable is a dummy variable. In this case, it would make sense a lot to do logisitic.
 
 
@@ -263,7 +267,8 @@ autoplot(logistic_test_conf_mat)
 
 ## KNN
 
-```{r KNN Qing}
+```{r message = FALSE, error=FALSE, warning=FALSE}
+#, results='hide'}
 
 
 # Defining the "recipe" to preprocess the data
@@ -454,12 +459,15 @@ knn_cm_test5 <- conf_mat(data = knn_eval_test5,
 
 print("Confusion matrix for testing data:")
 knn_cm_test5
-
+#what is the accuracy here based on the testing data?
+summary(knn_cm_test5)
 ```
 
 ## LASSO
 
-```{r LASSO Junyi}
+```{r message = FALSE, error=FALSE, warning=FALSE}
+#, results='hide'}
+
 # Here I create LASSO through find the best penalty to train my model and create the confusion matrixs
 lasso_world_recipe <- 
   recipe(strike ~ median_inc + earners + travel_work + rent +
@@ -586,7 +594,9 @@ lasso_new_conf_mat %>%
 
 ## Random Forest
 
-```{r Random Forest Edison}
+```{r message = FALSE, error=FALSE, warning=FALSE}
+#, results='hide'}
+
 # Create recipe
 rf_recipe1 <- recipe(strike_f ~ median_inc + earners + travel_work + rent +
           assi_income + employed + poverty_rate + ba_rate, data = data_train) %>%
