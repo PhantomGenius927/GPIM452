@@ -727,9 +727,10 @@ rf_cm_2 <- caret::confusionMatrix(data=rf_OOB_2$.pred_class, reference = data_te
 ```{r echo=FALSE, results='hide'}
 #making table of Balanced Accuracy - in the case of RF its accuracy
 
-tabrf <- rf_cm_2[["overall"]][["Accuracy"]] %>%
+testrf <- rf_cm_2[["overall"]][["Accuracy"]] %>%
   as.data.frame() 
-colnames(tabrf) <- c("Random Forest")
+colnames(testrf) <- c("Random Forest")
+testrf
 tabrf <- tabrf %>%  
   tt(digits = 3)
 tabrf
@@ -743,12 +744,27 @@ Our logistical regression provides $55.4\%$ accuracy in predicting labor action 
 
 The K-nearest neighbors (KNN) model number 5 selecting 43 neighbors was chosen as the final model to predict labor actions. The goal of this project is to predict labor actions as accurately as possible. Seeing that the KNN model was the most accurate of all the models tested, at a $58\%$ accuracy rate, it was chosen over all other models. *(see table 1)*
 
-```{r echo=FALSE}
-tottab <- cross_join(tablog, tabknn)
-tottab <- cross_join(tottab, tablasso) 
-tottab <- cross_join(tottab, tabrf)
-cat("Table 1: Accuracy of Each Model (% of correct predictions)")
-tottab
+```{r warning=FALSE}
+#tottab <- cross_join(tablog, tabknn)
+#tottab <- cross_join(tottab, tablasso) 
+#tottab <- cross_join(tottab, tabrf)
+#cat("Table 1: Accuracy of Each Model (% of correct predictions)")
+#tottab
+
+testlog <- as.data.frame(testlog)
+testknn <- as.data.frame(testknn)
+testlasso <- as.data.frame(testlasso)
+#testrf already df
+
+tottest <- merge.data.frame(testknn, testlasso)
+tottest <- merge.data.frame(tottest, testlog)
+tottest <- merge.data.frame(tottest, testrf)
+tottest <- tottest %>% round(., digits = 3)
+#install.packages("gt")
+library(gt)
+
+table <- gt(tottest, caption = "Accuracy Rate for Prediction Models")
+table
 ```
 
 Furthermore, as mentioned earlier, this decision was made because when predicting labor actions, it's crucial to prioritize accuracy above all other evaluation metrics. To explain, the cost of failing to predict most labor actions correctly is likely higher than the cost of having more false positives or false negatives. In other words, the KNN model that selects 43 neighbors was chosen because it had the highest recorded accuracy in predicting labor actions based on the testing data set, making it the most cost-minimizing option for any real-world applications.
