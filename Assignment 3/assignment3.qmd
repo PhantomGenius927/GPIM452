@@ -9,7 +9,7 @@ execute:
   message: false
 ---
 
-```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
+```{r echo=FALSE, results='hide'}
 library(tidycensus)
 library(tidyverse)
 library(tidymodels) # collection of packages for machine learning 
@@ -25,7 +25,7 @@ library(tinytable)
 set.seed(315)
 ```
 
-```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
+```{r echo=FALSE, results='hide'}
 vars <- c(
   "B06011_001E", # mean income
   "B19122_001E", # household earner
@@ -50,7 +50,7 @@ LAT_train <- readxl::read_xlsx("Data Raw/Labor action tracker data 12.4.23.xlsx"
 LAT_test <- readxl::read_xlsx("Data Raw/Labor action tracker data 2.26.24.xlsx")
 ```
 
-```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
+```{r echo=FALSE, results='hide'}
 county <- tigris::counties(cb = TRUE)
 #----------
 # LAT Train Data
@@ -121,7 +121,7 @@ LAT_test <- LAT_test %>%
   select(1:10, 23, 11:22, 24, 29, 31)
 ```
 
-```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
+```{r echo=FALSE, results='hide'}
 ACS <- ACS %>%  
   select(GEOID, ends_with("E")) %>%
   separate(col = "NAME", into = c("County", "State"), sep = ",") %>%
@@ -143,7 +143,7 @@ ACS <- ACS %>%
   )
 ```
 
-```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
+```{r echo=FALSE, results='hide'}
 #Here is the final data set with all acs variables and the LAT data
 #Since around 90% of the duration was NAs, so I did not unify the time into a new column.
 
@@ -181,7 +181,7 @@ write_csv(data_train, "Data Clean/data_train.csv")
 write_csv(data_test, "Data Clean/data_test.csv")
 ```
 
-```{r message = FALSE, error=FALSE, warning=FALSE}
+```{r echo=FALSE, results='hide'}
 #, results='hide'}
 
 # I also build the log model. This is because I think LASSO implys that the relationship should be linear. However, our dependent variable is a dummy variable. In this case, it would make sense a lot to do logisitic.
@@ -246,30 +246,29 @@ logistic_new_test_predictions <- test_predictions %>%
 logistic_test_conf_mat <- conf_mat(logistic_new_test_predictions, truth = actual_class, estimate = predicted_class)
 ```
 
-```{r}
+```{r echo=FALSE, results='hide'}
 # Print the confusion matrix
 print(logistic_test_conf_mat)
 ```
 
-```{r}
+```{r echo=FALSE, results='hide'}
 # Optionally, print summary metrics
 summary(logistic_test_conf_mat)
 ```
 
-```{r results='hide'}
+```{r echo=FALSE, results='hide'}
 testlog <- summary(logistic_test_conf_mat) %>% slice(1)
 testlog <- testlog[,-c(1:2)]
 tablog <- testlog %>% tt(digits = 3)
 colnames(tablog) <- c("Logistic")
-tablog
 ```
 
-```{r}
+```{r echo=FALSE, results='hide'}
 # Visualize the confusion matrix (if desired)
-autoplot(logistic_test_conf_mat)
+# autoplot(logistic_test_conf_mat)
 ```
 
-```{r message = FALSE, error=FALSE, warning=FALSE}
+```{r echo=FALSE, results='hide'}
 #, results='hide'}
 
 
@@ -431,7 +430,7 @@ knn_success_tm4 <- collect_metrics(knn_fit_cv_tm4)$mean[1]
 knn_success_tm5 <- collect_metrics(knn_fit_cv_tm5)$mean[1]
 ```
 
-```{r}
+```{r echo=FALSE, results='hide'}
 # Displaying the accuracy rates
 
 paste("Model 1 accuracy:", round(knn_success_tm1, 3))
@@ -459,30 +458,27 @@ knn_cm_test5 <- conf_mat(data = knn_eval_test5,
                     estimate = .pred_class)
 ```
 
-```{r}
+```{r echo=FALSE, results='hide'}
 # Printing confusion matrices
 print("Confusion matrix for testing data:")
 knn_cm_test5
 ```
 
-```{r}
+```{r echo=FALSE, results='hide'}
 #what is the accuracy here based on the testing data?
 summary(knn_cm_test5)
 
 ```
 
-```{r results='hide'}
+```{r echo=FALSE, results='hide'}
 testknn <- summary(knn_cm_test5) %>% slice(1)
 testknn <- testknn[,-c(1:2)]
-testknn$Accuracy <- testknn$.estimate
+#testknn$Accuracy <- testknn$.estimate
 tabknn <- testknn %>% tt(digits = 3)
 colnames(tabknn) <- c("KNN")
-tabknn
 ```
 
-## LASSO
-
-```{r message = FALSE, error=FALSE, warning=FALSE}
+```{r echo=FALSE, results='hide'}
 #, results='hide'}
 
 # Here I create LASSO through find the best penalty to train my model and create the confusion matrixs
@@ -550,14 +546,14 @@ lasso_grid_metrics <- lasso_grid |>
   collect_metrics() |>
   print()
 
-lasso_grid_metrics |>
-  filter(.metric == "rmse") |> 
-  ggplot(aes(x = penalty, y = mean)) +
-  geom_errorbar(aes(ymin = mean - std_err, ymax = mean + std_err), 
-                alpha = 0.5) +
-  geom_line(size = 1.5) +
+#lasso_grid_metrics |>
+#  filter(.metric == "rmse") |> 
+#  ggplot(aes(x = penalty, y = mean)) +
+#  geom_errorbar(aes(ymin = mean - std_err, ymax = mean + std_err), 
+#                alpha = 0.5) +
+#  geom_line(size = 1.5) +
   # scale_x_log10() +
-  labs(x = "Penalty", y = "rmse")
+#  labs(x = "Penalty", y = "rmse")
 
 
 #Use the lowest_rmse to train the model
@@ -569,19 +565,19 @@ final_lasso <- finalize_workflow(
   lowest_rmse
 )
 
-final_lasso |>
-  fit(data_train) |>
-  extract_fit_parsnip() |>
-  vip::vi(lambda = lowest_rmse$penalty) |>
-  mutate(
-    Importance = abs(Importance),
-    Variable = forcats::fct_reorder(Variable, Importance)
-  ) |>
-  filter(Importance != 0) |> 
-  ggplot(aes(x = Importance, y = Variable, fill = Sign)) +
-  geom_col() +
-  scale_x_continuous(expand = c(0, 0)) +
-  labs(y = NULL)
+#final_lasso |>
+#  fit(data_train) |>
+#  extract_fit_parsnip() |>
+#  vip::vi(lambda = lowest_rmse$penalty) |>
+#  mutate(
+#    Importance = abs(Importance),
+#    Variable = forcats::fct_reorder(Variable, Importance)
+#  ) |>
+#  filter(Importance != 0) |> 
+#  ggplot(aes(x = Importance, y = Variable, fill = Sign)) +
+#  geom_col() +
+#  scale_x_continuous(expand = c(0, 0)) +
+#  labs(y = NULL)
 
 
 #----------
@@ -602,25 +598,24 @@ lasso_new_test_predictions <- test_predictions %>%
 lasso_new_conf_mat <- conf_mat(lasso_new_test_predictions, truth = actual_class, estimate = predicted_class)
 
 # Print the confusion matrix
-print(lasso_new_conf_mat)
+# print(lasso_new_conf_mat)
 ```
 
-```{r}
+```{r echo=FALSE, results='hide'}
 # For detailed evaluation metrics
 lasso_new_conf_mat %>%
   summary()
 ```
 
-```{r results='hide'}
+```{r echo=FALSE, results='hide'}
 testlasso <- lasso_new_conf_mat %>%
                   summary() %>% slice(1)
 testlasso <- testlasso[,-c(1:2)]
 tablasso <- testlasso %>% tt(digits = 3)
 colnames(tablasso) <- c("Lasso")
-tablasso
 ```
 
-```{r message = FALSE, error=FALSE, warning=FALSE}
+```{r echo=FALSE, results='hide'}
 #, results='hide'}
 
 # Create recipe
@@ -708,8 +703,8 @@ rf_wflow4 <- rf_wflow2 %>%
   finalize_workflow(parameters = rf_best_auc2) %>%
   fit(data = data_train)
 
-vip(rf_wflow3)
-vip(rf_wflow4)
+#vip(rf_wflow3)
+#vip(rf_wflow4)
 
 rf_OOB_1 <- predict(rf_wflow3, new_data = data_test) %>%
   as_tibble()
@@ -719,68 +714,67 @@ rf_OOB_2 <- predict(rf_wflow4, new_data = data_test) %>%
   as_tibble()
 rf_cm_2 <- caret::confusionMatrix(data=rf_OOB_2$.pred_class, reference = data_test$strike_f)
 
-print(rf_cm_1)
+# print(rf_cm_1)
 ```
 
-```{r}
-print(rf_cm_2)
+```{r echo=FALSE, results='hide'}
+# print(rf_cm_2)
 ```
 
-```{r results = 'hide'}
+```{r echo=FALSE, results='hide'}
 #making table of Balanced Accuracy - in the case of RF its accuracy
 
 tabrf <- rf_cm_2[["overall"]][["Accuracy"]] %>% as.data.frame() %>% tt(digits = 3)
-colnames(tabrf) <- c("RF")
-tabrf
+colnames(tabrf) <- c("Random Forest")
 ```
 
-## Introduction
+# Introduction
 
-In this project our group built and compared four predictive models (Logistic Regression, KNN, LASSO, and Random Forest) in order to most accurately predict whether labor action in the Labor Action Tracker (LAT) data set is a “strike” \[1\] or “non-strike” \[0\]. All models were considered on the basis of accuracy and not area under the ROC curve because of the priority placed on correct predictions over few false positives/negatives and because of the balanced predictor variable classes.
+In this project our group built and compared four predictive models (Logistic Regression, KNN, LASSO, and Random Forest) in order to most accurately predict whether labor action in the Labor Action Tracker (LAT) data set is a "strike" \[1\] or "non-strike" \[0\]. All models were considered on the basis of accuracy and not area under the ROC curve because of the priority placed on correct predictions over few false positives/negatives and because of the balanced predictor variable classes.
 
-Our logistical regression provides $55.4\%$ accuracy in predicting labor action for unseen data. With regard to the LASSO model that has the lowest root-mean-square error (RMSE) when setting the penalty level at 0, the accuracy of its prediction is $55.8\%$. After tuning number of trees, number of randomly sampled predictors and minimum number of data points in a node, the Random Forest model reports $53.8\%$ accuracy in predicting with a best performing parameter–4 randomly sampled predictors, 10 decision trees and minimum 8 data points in each node.
+Our logistical regression provides $55.4\%$ accuracy in predicting labor action for unseen data. With regard to the LASSO model that has the lowest root-mean-square error (RMSE) when setting the penalty level at 0, the accuracy of its prediction is $55.8\%$. After tuning number of trees, number of randomly sampled predictors and minimum number of data points in a node, the Random Forest model reports $53.8\%$ accuracy in predicting with a best performing parameter--4 randomly sampled predictors, 10 decision trees and minimum 8 data points in each node.
 
 The K-nearest neighbors (KNN) model number 5 selecting 43 neighbors was chosen as the final model to predict labor actions. The goal of this project is to predict labor actions as accurately as possible. Seeing that the KNN model was the most accurate of all the models tested, at a $58\%$ accuracy rate, it was chosen over all other models. *(see table 1)*
 
-```{r}
+```{r echo=FALSE}
 tottab <- cross_join(tablog, tabknn)
 tottab <- cross_join(tottab, tablasso) 
 tottab <- cross_join(tottab, tabrf)
-print("Table 1: Accuracy of Each Model (% of correct predictions)")
-tottab
+cat("Table 1: Accuracy of Each Model (% of correct predictions)")
+print(tottab)
 ```
 
 Furthermore, as mentioned earlier, this decision was made because when predicting labor actions, it's crucial to prioritize accuracy above all other evaluation metrics. To explain, the cost of failing to predict most labor actions correctly is likely higher than the cost of having more false positives or false negatives. In other words, the KNN model that selects 43 neighbors was chosen because it had the highest recorded accuracy in predicting labor actions based on the testing data set, making it the most cost-minimizing option for any real-world applications.
 
-## Data Manipulation
+# Data Manipulation
 
 In cleaning and preparing the LAT dataset there were four major changes made: Data Transformation into Tidy Format, Parsing Coordinate Variable, Merging New Variables into the Data Set, and Creation of New Variables
 
-1.  Each row was manipulated so that it represented one observation instead of multiple. This was done by duplicating rows based on whether the values in the “number of locations” column was greater than one.
+1.  Each row was manipulated so that it represented one observation instead of multiple. This was done by duplicating rows based on whether the values in the "number of locations" column was greater than one.
 
-2.  The “Latitude, Longitude” column was split into separate respective variables (“lat”, “lon”).
+2.  The "Latitude, Longitude" column was split into separate respective variables ("lat", "lon").
 
-3.  The “GEOID” column in the countries data set from the tigris library package was used as a key to merge the LAT data set with an imported ACS county-level dataset. In general, our group intends to examine worker’s financial situations, costs to work and basic demographic features as strong indicators in predicting a possible strike, and thus, from the ACS county data set ten variables were imported and merged into the LAT dataset:
+3.  The "GEOID" column in the countries data set from the tigris library package was used as a key to merge the LAT data set with an imported ACS county-level dataset. In general, our group intends to examine worker's financial situations, costs to work and basic demographic features as strong indicators in predicting a possible strike, and thus, from the ACS county data set ten variables were imported and merged into the LAT dataset:
 
     -   Median income, total household earners, public assistance for past 12 months, total population below poverty population, mean travel time to work, median gross rent, total population over 25, total population over 25 with BA degree, population over 16 years employed.  
 
 4.  From the new variables merged into the LAT data set, variables for poverty rate and college degree rate were made. Poverty rate was created by dividing the total population below poverty by the total population, and the college (BA) degree rate was created by dividing the college degree population over 25 by the total population.
 
-With regards to missing data, there were only two instances in which it was encountered. The first was one longitude data missing for action in “2023-06-30 13:47:25” from the LAT training data set during the data manipulating process. This was resolved by replacing it with the corresponding longitude value from the LAT training data set. Second, when creating models for prediction, all predictor variable missing values were replaced with their corresponding means and then normalized.
+With regards to missing data, there were only two instances in which it was encountered. The first was one longitude data missing for action in "2023-06-30 13:47:25" from the LAT training data set during the data manipulating process. This was resolved by replacing it with the corresponding longitude value from the LAT training data set. Second, when creating models for prediction, all predictor variable missing values were replaced with their corresponding means and then normalized.
 
-## Model Assessment
+# Model Assessment
 
 This part will show the detailed steps of how the model has been trained and how well the final model performs in the validation sets and test data.
 
-First, it is important to note that not all of the variables present in the “new” LAT data set were used, only the following variables were used: median income, household earners, mean travel time to work, median rent, public assistance for past 12 months, total employed population, poverty rate, and college degree rate. All other variables were excluded due to being used to create the two new variables college degree rate and poverty rate, and if included could bias the results.
+First, it is important to note that not all of the variables present in the "new" LAT data set were used, only the following variables were used: median income, household earners, mean travel time to work, median rent, public assistance for past 12 months, total employed population, poverty rate, and college degree rate. All other variables were excluded due to being used to create the two new variables college degree rate and poverty rate, and if included could bias the results.
 
-The prediction model had the predicted variable \`strike_f\` (categorical variable for strike or non-strike as \[1\] or \[0\] ) on the left hand side and the aforementioned eight variables on the right hand side. All predictor variables are normalized. Then, five different KNN models are made using the following values for k (nearest neighbors): square root of $n=59$, square root of $n/2=29$, square root of $2*n=119$, halfway between the the square root of n and square root of $2*n=89$, and halfway between square root of n and square root of $n/2=43$, with n as the number of observations. Choosing such diverse *k* values, and points in between, for KNN model development can help identify the optimal balance between sensitivity to local data structures and generalization ability, aiming to enhance model accuracy by exploring a range of model complexities. This approach can help find a *k* that minimizes bias and variance, which is critical for achieving the best predictive performance.
+The prediction model had the predicted variable *strike_f* (categorical variable for strike or non-strike as \[1\] or \[0\] ) on the left hand side and the aforementioned eight variables on the right hand side. All predictor variables are normalized. Then, five different KNN models are made using the following values for *k* (nearest neighbors): square root of $n=59$, square root of $n/2=29$, square root of $2*n=119$, halfway between the the square root of n and square root of $2*n=89$, and halfway between square root of n and square root of $n/2=43$, with n as the number of observations. Choosing such diverse *k* values, and points in between, for KNN model development can help identify the optimal balance between sensitivity to local data structures and generalization ability, aiming to enhance model accuracy by exploring a range of model complexities. This approach can help find a *k* that minimizes bias and variance, which is critical for achieving the best predictive performance.
 
 Then, workflows were set up and 5 KNN models (with unique *k* values) were fitted to LAT training data. 10-fold cross validation was used to resample each of the 5 KNN models, and model number 5 ($k=43$) had the highest mean accuracy rate. 
 
 KNN model number 5 in the validation data set performed almost equally as well as it did with the test set, having an accuracy rate of $57.9\%$ and $58.01\%$ respectively. The little change in accuracy from the cross validation to the test data set indicates a high probability of it being unlikely that the current model is overfit to the training data set, strengthening the validity of the models prediction capabilities. Additionally, it is important to note that KNN models do not offer any indication of which predictor variables were most important in determining the prediction accuracy. 
 
-```{r results='hide'}
+```{r echo=FALSE}
 library(ggplot2)
 
 knn_cm_test5_accuracy <- summary(knn_cm_test5) %>% slice(1)
@@ -811,7 +805,7 @@ ggplot(accuracy_data, aes(x = Model, y = Accuracy, fill = Model)) +
   scale_fill_brewer(palette = "Pastel1")
 ```
 
-## Conclusions
+# Conclusions
 
 One of the major weaknesses of KNN model number 5 is that every time the model is run, despite setting a seed to keep random variation consistent, the accuracy of the model changes by one or two percentage points. However, of the five models, KNN model number 5 consistently remains the most accurate even after cross-validation. Another major weakness of the model is that the optimum number of nearest neighbors has not been identified; this can be a point of improvement. 
 

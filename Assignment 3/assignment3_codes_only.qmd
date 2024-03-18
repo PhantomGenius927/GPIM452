@@ -10,6 +10,7 @@ execute:
 ---
 
 ## Introduction
+
 ```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
 library(tidycensus)
 library(tidyverse)
@@ -52,6 +53,7 @@ LAT_test <- readxl::read_xlsx("Data Raw/Labor action tracker data 2.26.24.xlsx")
 ```
 
 ## Data Cleaning--LAT Junyi & Edison
+
 ```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
 county <- tigris::counties(cb = TRUE)
 #----------
@@ -124,6 +126,7 @@ LAT_test <- LAT_test %>%
 ```
 
 ## Data Cleaning--ACS
+
 ```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
 ACS <- ACS %>%  
   select(GEOID, ends_with("E")) %>%
@@ -147,6 +150,7 @@ ACS <- ACS %>%
 ```
 
 ## Training Data and Test Data
+
 ```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
 #Here is the final data set with all acs variables and the LAT data
 #Since around 90% of the duration was NAs, so I did not unify the time into a new column.
@@ -186,6 +190,7 @@ write_csv(data_test, "Data Clean/data_test.csv")
 ```
 
 ## Logit
+
 ```{r message = FALSE, error=FALSE, warning=FALSE}
 #, results='hide'}
 
@@ -275,6 +280,7 @@ autoplot(logistic_test_conf_mat)
 ```
 
 ## KNN
+
 ```{r message = FALSE, error=FALSE, warning=FALSE}
 #, results='hide'}
 
@@ -487,6 +493,7 @@ tabknn
 ```
 
 # Bar Plot of Accuracy
+
 ```{r results='hide'}
 
 library(ggplot2)
@@ -523,6 +530,7 @@ ggplot(accuracy_data, aes(x = Model, y = Accuracy, fill = Model)) +
 ```
 
 ## LASSO
+
 ```{r message = FALSE, error=FALSE, warning=FALSE}
 #, results='hide'}
 
@@ -662,6 +670,7 @@ tablasso
 ```
 
 ## Random Forest
+
 ```{r message = FALSE, error=FALSE, warning=FALSE}
 #, results='hide'}
 
