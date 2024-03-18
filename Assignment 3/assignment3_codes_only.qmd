@@ -9,9 +9,7 @@ execute:
   message: false
 ---
 
-## Introduction
-
-```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
+```{r }
 library(tidycensus)
 library(tidyverse)
 library(tidymodels) # collection of packages for machine learning 
@@ -27,7 +25,7 @@ library(tinytable)
 set.seed(315)
 ```
 
-```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
+```{r}
 vars <- c(
   "B06011_001E", # mean income
   "B19122_001E", # household earner
@@ -54,7 +52,7 @@ LAT_test <- readxl::read_xlsx("Data Raw/Labor action tracker data 2.26.24.xlsx")
 
 ## Data Cleaning--LAT Junyi & Edison
 
-```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
+```{r}
 county <- tigris::counties(cb = TRUE)
 #----------
 # LAT Train Data
@@ -125,9 +123,9 @@ LAT_test <- LAT_test %>%
   select(1:10, 23, 11:22, 24, 29, 31)
 ```
 
-## Data Cleaning--ACS
+## Data Cleaning--ACS Junyi & Edison
 
-```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
+```{r}
 ACS <- ACS %>%  
   select(GEOID, ends_with("E")) %>%
   separate(col = "NAME", into = c("County", "State"), sep = ",") %>%
@@ -149,9 +147,9 @@ ACS <- ACS %>%
   )
 ```
 
-## Training Data and Test Data
+## Training Data and Test Data Junyi & Edison
 
-```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
+```{r}
 #Here is the final data set with all acs variables and the LAT data
 #Since around 90% of the duration was NAs, so I did not unify the time into a new column.
 
@@ -189,9 +187,9 @@ write_csv(data_train, "Data Clean/data_train.csv")
 write_csv(data_test, "Data Clean/data_test.csv")
 ```
 
-## Logit
+## Logit Junyi
 
-```{r message = FALSE, error=FALSE, warning=FALSE}
+```{r}
 #, results='hide'}
 
 # I also build the log model. This is because I think LASSO implys that the relationship should be linear. However, our dependent variable is a dummy variable. In this case, it would make sense a lot to do logisitic.
@@ -234,9 +232,6 @@ cv_results_log <- fit_resamples(
 #Here I only select the accuracy as the metrics
 cv_summary_log <- collect_metrics(cv_results_log)
 print(cv_summary_log)
-
-
-
 #----------
 # Mectrics for LAT Test Data
 #----------
@@ -253,7 +248,9 @@ logistic_new_test_predictions <- test_predictions %>%
   mutate(predicted_class = .pred_class,actual_class = strike_f)
 
 # 6. Evaluate the Model
-logistic_test_conf_mat <- conf_mat(logistic_new_test_predictions, truth = actual_class, estimate = predicted_class)
+logistic_test_conf_mat <- conf_mat(logistic_new_test_predictions, 
+                                   truth = actual_class, 
+                                   estimate = predicted_class)
 ```
 
 ```{r}
@@ -279,12 +276,9 @@ tablog
 autoplot(logistic_test_conf_mat)
 ```
 
-## KNN
+## KNN Qing
 
-```{r message = FALSE, error=FALSE, warning=FALSE}
-#, results='hide'}
-
-
+```{r}
 # Defining the "recipe" to preprocess the data
 
 knn_recipe <- recipe(strike_f ~ median_inc + earners + travel_work + rent +
@@ -294,14 +288,12 @@ knn_recipe <- recipe(strike_f ~ median_inc + earners + travel_work + rent +
   step_scale(all_predictors()) |> # Normalizing standard deviation to one
   step_center(all_predictors())# Normalizing mean to one
 
-
 # KNN Model 1
 
 knn_model1 <- nearest_neighbor(
   mode = "classification", # Our Y is categorical, so we use classification
   engine = "kknn", # Engine for KNN used by tidymodels
   neighbors = 59) # sqrt n
-
 
 # Setting up the workflow
 
@@ -315,9 +307,6 @@ knn_workflow1 <- workflow() |>
 knn_fit1 <- knn_workflow1 |>
   fit(data = data_train)
 
-
-
-
 #-------------------------------------------------------------------------------
 
 # KNN Model 2
@@ -327,13 +316,11 @@ knn_model2 <- nearest_neighbor(
   engine = "kknn", # Engine for KNN used by tidymodels
   neighbors = 29) # sqrt n/2
 
-
 # Setting up the workflow
 
 knn_workflow2 <- workflow() |>
   add_recipe(knn_recipe) |>
   add_model(knn_model2)
-
 
 # Fitting model to training data
 
@@ -349,13 +336,11 @@ knn_model3 <- nearest_neighbor(
   engine = "kknn", # Engine for KNN used by tidymodels
   neighbors = 119) # sqrt n*2
 
-
 # Setting up the workflow
 
 knn_workflow3 <- workflow() |>
   add_recipe(knn_recipe) |>
   add_model(knn_model3)
-
 
 # Fitting model to training data
 
@@ -370,7 +355,6 @@ knn_model4 <- nearest_neighbor(
   mode = "classification", # Our Y is categorical, so we use classification
   engine = "kknn", # Engine for KNN used by tidymodels
   neighbors = 89) # between model 1 and 3
-
 
 # Setting up the workflow
 
@@ -392,13 +376,11 @@ knn_model5 <- nearest_neighbor(
   engine = "kknn", # Engine for KNN used by tidymodels
   neighbors = 43) # between model 1 and 2
 
-
 # Setting up the workflow
 
 knn_workflow5 <- workflow() |>
   add_recipe(knn_recipe) |>
   add_model(knn_model5)
-
 
 # Fitting model to training data
 
@@ -410,7 +392,6 @@ knn_fit5 <- knn_workflow5 |>
 # 10-fold cross-validation
 
 knn_folds_tm <- vfold_cv(data_train, v = 10)
-
 
 # Fitting the models using `fit_resamples`
 
@@ -480,34 +461,31 @@ knn_cm_test5
 ```{r}
 #what is the accuracy here based on the testing data?
 summary(knn_cm_test5)
-
 ```
 
-```{r results='hide'}
+```{r}
 testknn <- summary(knn_cm_test5) %>% slice(1)
 testknn <- testknn[,-c(1:2)]
-testknn$Accuracy <- testknn$.estimate
 tabknn <- testknn %>% tt(digits = 3)
 colnames(tabknn) <- c("KNN")
 tabknn
 ```
 
-# Bar Plot of Accuracy
+# Bar Plot of Accuracy Junyi
 
-```{r results='hide'}
-
+```{r}
 library(ggplot2)
-
-
 knn_cm_test5_accuracy <- summary(knn_cm_test5) %>% slice(1)
 # Assuming knn_cm_test5_accuracy is a tibble or data frame
 knn_cm_test5_accuracy_value <- knn_cm_test5_accuracy %>% 
   pull(.estimate)
 
-
 # Step 1: Create a data frame of accuracy rates
-model_names <- c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5","Model 5 in Test Data")
-accuracy_rates <- c(knn_success_tm1, knn_success_tm2, knn_success_tm3, knn_success_tm4, knn_success_tm5, knn_cm_test5_accuracy_value)
+model_names <- c("Model 1", "Model 2", "Model 3", "Model 4", 
+                 "Model 5","Model 5 in Test Data")
+accuracy_rates <- c(knn_success_tm1, knn_success_tm2, knn_success_tm3, 
+                    knn_success_tm4, knn_success_tm5, 
+                    knn_cm_test5_accuracy_value)
 
 # Round the accuracy rates to two decimal places before creating the plot
 accuracy_rates <- round(accuracy_rates, 4) # Here, rounding to 4 decimal places for more precision
@@ -529,11 +507,9 @@ ggplot(accuracy_data, aes(x = Model, y = Accuracy, fill = Model)) +
 
 ```
 
-## LASSO
+## LASSO Junyi
 
-```{r message = FALSE, error=FALSE, warning=FALSE}
-#, results='hide'}
-
+```{r}
 # Here I create LASSO through find the best penalty to train my model and create the confusion matrixs
 lasso_world_recipe <- 
   recipe(strike ~ median_inc + earners + travel_work + rent +
@@ -563,7 +539,6 @@ penalty_grid <- tibble(
 lasso_folds <- vfold_cv(data_train, v = 10)
 doParallel::registerDoParallel()
 
-
 lasso_grid <- tune_grid(
   lasso_wf |> add_model(lasso_tune_spec),
   resamples = lasso_folds,   # 10 fold cross validation
@@ -573,7 +548,6 @@ lasso_grid <- tune_grid(
 #lasso_grid_metrics <- lasso_grid |>
 #  collect_metrics() |>
 #  print()
-
 
 lasso_results <- lasso_grid %>%
   collect_metrics() 
@@ -648,7 +622,9 @@ lasso_new_test_predictions <- test_predictions %>%
          actual_class = strike_f)
 
 # Create a confusion matrix
-lasso_new_conf_mat <- conf_mat(lasso_new_test_predictions, truth = actual_class, estimate = predicted_class)
+lasso_new_conf_mat <- conf_mat(lasso_new_test_predictions, 
+                               truth = actual_class, 
+                               estimate = predicted_class)
 
 # Print the confusion matrix
 print(lasso_new_conf_mat)
@@ -660,7 +636,7 @@ lasso_new_conf_mat %>%
   summary()
 ```
 
-```{r results='hide'}
+```{r}
 testlasso <- lasso_new_conf_mat %>%
                   summary() %>% slice(1)
 testlasso <- testlasso[,-c(1:2)]
@@ -669,9 +645,9 @@ colnames(tablasso) <- c("Lasso")
 tablasso
 ```
 
-## Random Forest
+## Random Forest Edison
 
-```{r message = FALSE, error=FALSE, warning=FALSE}
+```{r}
 #, results='hide'}
 
 # Create recipe
@@ -764,11 +740,13 @@ vip(rf_wflow4)
 
 rf_OOB_1 <- predict(rf_wflow3, new_data = data_test) %>%
   as_tibble()
-rf_cm_1 <- caret::confusionMatrix(data=rf_OOB_1$.pred_class, reference = data_test$strike_f)
+rf_cm_1 <- caret::confusionMatrix(data=rf_OOB_1$.pred_class, 
+                                  reference = data_test$strike_f)
 
 rf_OOB_2 <- predict(rf_wflow4, new_data = data_test) %>% 
   as_tibble()
-rf_cm_2 <- caret::confusionMatrix(data=rf_OOB_2$.pred_class, reference = data_test$strike_f)
+rf_cm_2 <- caret::confusionMatrix(data=rf_OOB_2$.pred_class, 
+                                  reference = data_test$strike_f)
 
 print(rf_cm_1)
 ```
@@ -777,10 +755,12 @@ print(rf_cm_1)
 print(rf_cm_2)
 ```
 
-```{r results = 'hide'}
+```{r}
 #making table of Balanced Accuracy - in the case of RF its accuracy
 
-tabrf <- rf_cm_2[["overall"]][["Accuracy"]] %>% as.data.frame() %>% tt(digits = 3)
+tabrf <- rf_cm_2[["overall"]][["Accuracy"]] %>% 
+  as.data.frame() %>% 
+  tt(digits = 3)
 colnames(tabrf) <- c("RF")
 tabrf
 ```
@@ -792,9 +772,4 @@ tottab <- cross_join(tottab, tablasso)
 tottab <- cross_join(tottab, tabrf)
 print("Table 1: Accuracy of Each Model (% of correct predictions)")
 tottab
-
-
-
-#gg_dta <- gg_roc(rf_wflow4, which.outcome=2)
-#plot(gg_dta)
 ```
