@@ -1,0 +1,806 @@
+---
+title: "Assignment 3"
+author: "Group 2: Edison Hu, Qing Yin, Junyi Hua, GianCarlo Samayoa"
+format: pdf
+editor: visual
+date: Mar 18 2024
+execute: 
+  warning: false
+  message: false
+---
+
+## Introduction
+
+In this project our group built and compared four predictive models (Logistic Regression, KNN, LASSO, and Random Forest) in order to most accurately predict whether a labor action in the Labor Action Tracker (LAT) data set is a "strike" \[1\] or "non-strike" \[0\].
+
+```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
+library(tidycensus)
+library(tidyverse)
+library(tidymodels) # collection of packages for machine learning 
+library(kknn) # package for k-nearest neighbors models
+library(sf)
+library(rpart)
+library(ranger)
+library(vip)
+library(tune)
+library(tinytable)
+
+# setting randomization parameter
+set.seed(315)
+```
+
+```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
+vars <- c(
+  "B06011_001E", # mean income
+  "B19122_001E", # household earner
+  "DP03_0025E", # Median Gross Rent (Dollars)
+  "B25064_001E", # Mean travel time to work (minutes)
+  "B19058_001E",# Public Assistance Income or Food Stamps/SNAP in the Past 12 Months for Households 
+  "DP02_0068E",# Total population over 25 years with bachelor's degree or higher
+  "DP02_0059E", # Total population over 25 years
+  "DP03_0048PE", # Civilian employed population 16 years and over
+  "B17001_001E", # total_pop
+  "B17001_002E" # below_poverty
+  )
+
+# census_api_key("8f18e1531b731fb432dd5a9657d8ee937a0290da", install = TRUE, overwrite = TRUE)
+ACS <- get_acs(geography = "county", 
+                    variables = vars, 
+                    year = 2022,
+                    survey = "acs1", 
+                    output = "wide")
+
+LAT_train <- readxl::read_xlsx("Data Raw/Labor action tracker data 12.4.23.xlsx")
+LAT_test <- readxl::read_xlsx("Data Raw/Labor action tracker data 2.26.24.xlsx")
+```
+
+## Data Cleaning--LAT Junyi & Edison
+
+how the LAT data was manipulated -
+
+```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
+county <- tigris::counties(cb = TRUE)
+#----------
+# LAT Train Data
+#----------
+LAT_train <- LAT_train %>%
+  mutate(
+    coordinate = ifelse(
+      `Number of Locations` > 1,
+      strsplit(as.character(`Latitude, Longitude`), ";\\s*"),
+      `Latitude, Longitude`
+    ))%>%  
+  unnest(coordinate)
+LAT_train <- separate(LAT_train, coordinate, into = c("lat", "lon"), 
+                 sep = ",\\s*", remove = FALSE)
+# check is there any NAs 
+LAT_train <- LAT_train %>%
+  mutate(
+    lat = as.numeric(lat),
+    lon = as.numeric(lon))
+na_summary <- LAT_train %>%
+  summarise_all(~ sum(is.na(.)))
+# yes, there is one in lon column. 
+LAT_train$lon[2830] = -85.73642799999999
+# transform LAT data into geometric data frame
+LAT_train <- st_as_sf(LAT_train, coords = c("lon", "lat"))
+# matching same projection
+st_crs(LAT_train) <- st_crs(county)
+# joining 2 geometric data frames
+LAT_train <- st_join(LAT_train, county)
+# housekeeping and make LAT data looks clean and organized
+vars <- names(LAT_train)
+LAT_train <- LAT_train %>%
+  select(c(all_of(vars), NAMELSAD, GEOID)) %>%
+  rename(County = NAMELSAD) %>%
+  select(1:10, 23, 11:22, 24, 29, 31)
+
+#----------
+# LAT Test Data
+#----------
+LAT_test <- LAT_test %>%
+  mutate(
+    coordinate = ifelse(
+      `Number of Locations` > 1,
+      strsplit(as.character(`Latitude, Longitude`), ";\\s*"),
+      `Latitude, Longitude`
+    ))%>%  
+  unnest(coordinate)
+LAT_test <- separate(LAT_test, coordinate, into = c("lat", "lon"), 
+                 sep = ",\\s*", remove = FALSE)
+# check is there any NAs 
+LAT_test <- LAT_test %>%
+  mutate(
+    lat = as.numeric(lat),
+    lon = as.numeric(lon))
+na_summary <- LAT_test %>%
+  summarise_all(~ sum(is.na(.))) # There is no NAs
+
+LAT_test <- st_as_sf(LAT_test, coords = c("lon", "lat"))
+# matching same projection
+st_crs(LAT_test) <- st_crs(county)
+# joining 2 geometric data frames
+LAT_test <- st_join(LAT_test, county)
+# housekeeping and make LAT data looks clean and organized
+vars <- names(LAT_test)
+LAT_test <- LAT_test %>%
+  select(c(all_of(vars), NAMELSAD, GEOID)) %>%
+  rename(County = NAMELSAD) %>%
+  select(1:10, 23, 11:22, 24, 29, 31)
+```
+
+## Data Cleaning--ACS
+
+```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
+ACS <- ACS %>%  
+  select(GEOID, ends_with("E")) %>%
+  separate(col = "NAME", into = c("County", "State"), sep = ",") %>%
+  rename(
+    "median_inc" = "B06011_001E",
+    "earners" = "B19122_001E",
+    "travel_work"="DP03_0025E",
+    "total_pop" = "B17001_001E",
+    "below_poverty" = "B17001_002E",
+    "rent" = "B25064_001E",
+    "assi_income"= "B19058_001E",
+    "ba_pop"= "DP02_0068E",
+    "total_pop25"="DP02_0059E",
+    "employed"="DP03_0048PE" # Civilian employed population 16 years and over
+) %>%
+  mutate(
+    poverty_rate = below_poverty/total_pop,
+    ba_rate = ba_pop/total_pop
+  )
+```
+
+## Training Data and Test Data
+
+```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
+#Here is the final data set with all acs variables and the LAT data
+#Since around 90% of the duration was NAs, so I did not unify the time into a new column.
+
+data_train <- left_join(LAT_train, ACS, by="GEOID")
+data_train <- as.data.frame(data_train)
+# clean out redundant variables
+data_train <- data_train  %>%
+  select(-ends_with(".x")) %>%
+  select(-ends_with(".y"))
+
+data_test <- left_join(LAT_test, ACS, by="GEOID")
+data_test <- as.data.frame(data_test)
+# clean out redundant variables
+data_test <- data_test  %>%
+  select(-ends_with(".x")) %>%
+  select(-ends_with(".y"))
+
+# A new column I combine the other two labor actions into non-strike 
+data_train <- data_train %>% 
+  mutate(strike = ifelse(`Strike or Protest`== "Strike",1,0))
+data_test <- data_test %>% 
+  mutate(strike = ifelse(`Strike or Protest`== "Strike",1,0))
+
+# factor outcome variable
+data_test$strike_f <- as.factor(data_test$strike)
+data_train$strike_f <- as.factor(data_train$strike)
+
+data_train <- data_train %>%
+  select(-geometry)
+data_test <- data_test %>%
+  select(-geometry)
+
+
+write_csv(data_train, "Data Clean/data_train.csv")
+write_csv(data_test, "Data Clean/data_test.csv")
+```
+
+## Logit
+
+```{r message = FALSE, error=FALSE, warning=FALSE}
+#, results='hide'}
+
+# I also build the log model. This is because I think LASSO implys that the relationship should be linear. However, our dependent variable is a dummy variable. In this case, it would make sense a lot to do logisitic.
+
+
+#Since run the log, our dependent variable should be a factor, so I create a new variable specifically for the factor version of "strike"
+
+# 1. Specify the Logistic Regression Model
+logistic_spec <- logistic_reg() %>% 
+  set_engine("glm") %>% 
+  set_mode("classification")
+
+# 2. Prepare the Recipe
+logistic_recipe <- 
+  recipe(strike_f ~ median_inc + earners + travel_work + rent +
+          assi_income + employed+poverty_rate+ba_rate, data = data_train) |>
+  step_dummy(all_nominal(), -all_outcomes()) %>%
+  step_impute_mean(all_predictors())
+
+# 3. Bundle the Model and Recipe into a Workflow
+logistic_workflow <- workflow() %>% 
+  add_model(logistic_spec) %>% 
+  add_recipe(logistic_recipe)
+
+#----------
+# Cross-validation
+#----------
+
+
+# create folds
+cv_splits_log <- vfold_cv(data_train, v = 10) # 10-fold cross-validation
+
+# Fit the Model to Your Training Data Using Cross-Validation
+cv_results_log <- fit_resamples(
+  logistic_workflow,
+  resamples = cv_splits_log,
+  metrics = metric_set(accuracy) # Choose your evaluation metrics
+)
+
+#Here I only select the accuracy as the metrics
+cv_summary_log <- collect_metrics(cv_results_log)
+print(cv_summary_log)
+
+
+
+#----------
+# Mectrics for LAT Test Data
+#----------
+
+logistic_final_fit <- fit(logistic_workflow, data = data_train)
+
+
+test_predictions <- logistic_final_fit %>% 
+  predict(new_data = data_test) %>% 
+  bind_cols(data_test)
+
+# To convert probabilities to binary outcome
+logistic_new_test_predictions <- test_predictions %>%
+  mutate(predicted_class = .pred_class,actual_class = strike_f)
+
+# 6. Evaluate the Model
+logistic_test_conf_mat <- conf_mat(logistic_new_test_predictions, truth = actual_class, estimate = predicted_class)
+```
+
+```{r}
+# Print the confusion matrix
+print(logistic_test_conf_mat)
+```
+
+```{r}
+# Optionally, print summary metrics
+summary(logistic_test_conf_mat)
+```
+
+```{r results='hide'}
+testlog <- summary(logistic_test_conf_mat) %>% slice(1)
+testlog <- testlog[,-c(1:2)]
+tablog <- testlog %>% tt(digits = 3)
+colnames(tablog) <- c("Logistic")
+tablog
+```
+
+```{r}
+# Visualize the confusion matrix (if desired)
+autoplot(logistic_test_conf_mat)
+```
+
+## KNN
+
+```{r message = FALSE, error=FALSE, warning=FALSE}
+#, results='hide'}
+
+
+# Defining the "recipe" to preprocess the data
+
+knn_recipe <- recipe(strike_f ~ median_inc + earners + travel_work + rent +
+          assi_income + employed+poverty_rate+ba_rate, 
+                 data = data_train) |>
+  step_impute_mean(all_predictors()) |>
+  step_scale(all_predictors()) |> # Normalizing standard deviation to one
+  step_center(all_predictors())# Normalizing mean to one
+
+
+# KNN Model 1
+
+knn_model1 <- nearest_neighbor(
+  mode = "classification", # Our Y is categorical, so we use classification
+  engine = "kknn", # Engine for KNN used by tidymodels
+  neighbors = 59) # sqrt n
+
+
+# Setting up the workflow
+
+knn_workflow1 <- workflow() |>
+  add_recipe(knn_recipe) |>
+  add_model(knn_model1)
+
+
+# Fitting model to training data
+
+knn_fit1 <- knn_workflow1 |>
+  fit(data = data_train)
+
+
+
+
+#-------------------------------------------------------------------------------
+
+# KNN Model 2
+
+knn_model2 <- nearest_neighbor(
+  mode = "classification", # Our Y is categorical, so we use classification
+  engine = "kknn", # Engine for KNN used by tidymodels
+  neighbors = 29) # sqrt n/2
+
+
+# Setting up the workflow
+
+knn_workflow2 <- workflow() |>
+  add_recipe(knn_recipe) |>
+  add_model(knn_model2)
+
+
+# Fitting model to training data
+
+knn_fit2 <- knn_workflow2 |>
+  fit(data = data_train)
+
+#-------------------------------------------------------------------------------
+
+# KNN Model 3
+
+knn_model3 <- nearest_neighbor(
+  mode = "classification", # Our Y is categorical, so we use classification
+  engine = "kknn", # Engine for KNN used by tidymodels
+  neighbors = 119) # sqrt n*2
+
+
+# Setting up the workflow
+
+knn_workflow3 <- workflow() |>
+  add_recipe(knn_recipe) |>
+  add_model(knn_model3)
+
+
+# Fitting model to training data
+
+knn_fit3 <- knn_workflow3 |>
+  fit(data = data_train)
+
+#-------------------------------------------------------------------------------
+
+# KNN Model 4
+
+knn_model4 <- nearest_neighbor(
+  mode = "classification", # Our Y is categorical, so we use classification
+  engine = "kknn", # Engine for KNN used by tidymodels
+  neighbors = 89) # between model 1 and 3
+
+
+# Setting up the workflow
+
+knn_workflow4 <- workflow() |>
+  add_recipe(knn_recipe) |>
+  add_model(knn_model4)
+
+# Fitting model to training data
+
+knn_fit4 <- knn_workflow4 |>
+  fit(data = data_train)
+
+#-------------------------------------------------------------------------------
+
+# KNN Model 5
+
+knn_model5 <- nearest_neighbor(
+  mode = "classification", # Our Y is categorical, so we use classification
+  engine = "kknn", # Engine for KNN used by tidymodels
+  neighbors = 43) # between model 1 and 2
+
+
+# Setting up the workflow
+
+knn_workflow5 <- workflow() |>
+  add_recipe(knn_recipe) |>
+  add_model(knn_model5)
+
+
+# Fitting model to training data
+
+knn_fit5 <- knn_workflow5 |>
+  fit(data = data_train)
+
+#-------------------------------------------------------------------------------
+
+# 10-fold cross-validation
+
+knn_folds_tm <- vfold_cv(data_train, v = 10)
+
+
+# Fitting the models using `fit_resamples`
+
+knn_fit_cv_tm1 <- knn_workflow1 |>
+  fit_resamples(data = data_train,
+                resamples = knn_folds_tm)
+
+knn_fit_cv_tm2 <- knn_workflow2 |>
+  fit_resamples(data = data_train,
+                resamples = knn_folds_tm)
+
+knn_fit_cv_tm3 <- knn_workflow3 |>
+  fit_resamples(data = data_train,
+                resamples = knn_folds_tm)
+
+knn_fit_cv_tm4 <- knn_workflow4 |>
+  fit_resamples(data = data_train,
+                resamples = knn_folds_tm)
+
+knn_fit_cv_tm5 <- knn_workflow5 |>
+  fit_resamples(data = data_train,
+                resamples = knn_folds_tm)
+
+# Collecting the mean accuracy rate for each model
+
+knn_success_tm1 <- collect_metrics(knn_fit_cv_tm1)$mean[1]
+knn_success_tm2 <- collect_metrics(knn_fit_cv_tm2)$mean[1]
+knn_success_tm3 <- collect_metrics(knn_fit_cv_tm3)$mean[1]
+knn_success_tm4 <- collect_metrics(knn_fit_cv_tm4)$mean[1]
+knn_success_tm5 <- collect_metrics(knn_fit_cv_tm5)$mean[1]
+```
+
+```{r}
+# Displaying the accuracy rates
+
+paste("Model 1 accuracy:", round(knn_success_tm1, 3))
+paste("Model 2 accuracy:", round(knn_success_tm2, 3))
+paste("Model 3 accuracy:", round(knn_success_tm3, 3))
+paste("Model 4 accuracy:", round(knn_success_tm4, 3))
+paste("Model 5 accuracy:", round(knn_success_tm5, 3))
+
+
+# Making predictions on the testing data using Model 5
+
+knn_preds_test5 <- predict(knn_fit5, 
+                      new_data = data_test, 
+                      type = "class") # Classification
+
+# Binding the actual and predicted Y's together in data frames
+
+knn_eval_test5 <- cbind("pop" = data_test$strike_f, knn_preds_test5)
+
+
+# Evaluating the models with confusion matrices
+
+knn_cm_test5 <- conf_mat(data = knn_eval_test5,
+                    truth = pop, 
+                    estimate = .pred_class)
+```
+
+```{r}
+# Printing confusion matrices
+print("Confusion matrix for testing data:")
+knn_cm_test5
+```
+
+```{r}
+#what is the accuracy here based on the testing data?
+summary(knn_cm_test5)
+
+```
+
+```{r results='hide'}
+testknn <- summary(knn_cm_test5) %>% slice(1)
+testknn <- testknn[,-c(1:2)]
+testknn$Accuracy <- testknn$.estimate
+tabknn <- testknn %>% tt(digits = 3)
+colnames(tabknn) <- c("KNN")
+tabknn
+```
+
+
+# Bar Plot of Accuracy
+
+```{r results='hide'}
+
+library(ggplot2)
+
+
+knn_cm_test5_accuracy <- summary(knn_cm_test5) %>% slice(1)
+# Assuming knn_cm_test5_accuracy is a tibble or data frame
+knn_cm_test5_accuracy_value <- knn_cm_test5_accuracy %>% 
+  pull(.estimate)
+
+
+# Step 1: Create a data frame of accuracy rates
+model_names <- c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5","Model 5 in Test Data")
+accuracy_rates <- c(knn_success_tm1, knn_success_tm2, knn_success_tm3, knn_success_tm4, knn_success_tm5, knn_cm_test5_accuracy_value)
+
+# Round the accuracy rates to two decimal places before creating the plot
+accuracy_rates <- round(accuracy_rates, 4) # Here, rounding to 4 decimal places for more precision
+
+# Then create your accuracy_data data frame
+accuracy_data <- data.frame(Model = model_names, Accuracy = accuracy_rates)
+
+# Now plot the data with accuracy rates labeled on the bars
+ggplot(accuracy_data, aes(x = Model, y = Accuracy, fill = Model)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  geom_text(aes(label = sprintf("%.2f%%", Accuracy * 100)),
+            position = position_dodge(width = 0.9),
+            vjust = -0.2,
+            color = "black") +
+  theme_minimal() +
+  labs(title = "KNN Models Accuracy Rates in Validation Set and Test Data", 
+       x = "Model", y = "Accuracy Rate") +
+  scale_fill_brewer(palette = "Pastel1")
+
+```
+
+
+## LASSO
+
+```{r message = FALSE, error=FALSE, warning=FALSE}
+#, results='hide'}
+
+# Here I create LASSO through find the best penalty to train my model and create the confusion matrixs
+lasso_world_recipe <- 
+  recipe(strike ~ median_inc + earners + travel_work + rent +
+          assi_income + employed+poverty_rate+ba_rate, data = data_train) |>
+  step_dummy(all_nominal(), -all_outcomes()) %>%
+  step_impute_mean(all_predictors())
+
+lasso_wf <- workflow() |> 
+  add_recipe(lasso_world_recipe)
+
+lasso_model <- linear_reg(penalty = .1, mixture = 1) |> 
+  set_engine("glmnet")
+
+#Pick the right penalty
+lasso_tune_spec <- linear_reg(penalty = tune(), mixture = 1) |> 
+  set_engine("glmnet")
+# the sequence of penalty parameters to search over
+  penalty_grid <- tibble(
+  penalty = seq(0, 5, by = .01)
+)
+
+#----------
+# Cross-validation for accuracy
+#----------
+
+# easy way to generate folds for cross validation
+lasso_folds <- vfold_cv(data_train, v = 10)
+doParallel::registerDoParallel()
+
+
+lasso_grid <- tune_grid(
+  lasso_wf |> add_model(lasso_tune_spec),
+  resamples = lasso_folds,   # 10 fold cross validation
+  grid = penalty_grid
+)
+
+#lasso_grid_metrics <- lasso_grid |>
+#  collect_metrics() |>
+#  print()
+
+
+lasso_results <- lasso_grid %>%
+  collect_metrics() 
+
+best_accuracy <- lasso_results %>%
+  filter(.metric == "accuracy") %>%
+  arrange(desc(mean)) %>%
+  slice(1) %>%
+  pull(penalty)
+
+final_lasso <- finalize_workflow(
+  lasso_wf |> add_model(lasso_model),
+  list(penalty = best_accuracy)
+)
+
+print(best_accuracy)
+
+#----------
+# Cross-validation for lowest rmse
+#----------
+
+lasso_grid_metrics <- lasso_grid |>
+  collect_metrics() |>
+  print()
+
+lasso_grid_metrics |>
+  filter(.metric == "rmse") |> 
+  ggplot(aes(x = penalty, y = mean)) +
+  geom_errorbar(aes(ymin = mean - std_err, ymax = mean + std_err), 
+                alpha = 0.5) +
+  geom_line(size = 1.5) +
+  # scale_x_log10() +
+  labs(x = "Penalty", y = "accuracy")
+
+
+#Use the lowest_rmse to train the model
+lowest_rmse <- lasso_grid |>
+  select_best("rmse")
+
+final_lasso <- finalize_workflow(
+  lasso_wf |> add_model(lasso_tune_spec),
+  lowest_rmse
+)
+
+final_lasso |>
+  fit(data_train) |>
+  extract_fit_parsnip() |>
+  vip::vi(lambda = lowest_rmse$penalty) |>
+  mutate(
+    Importance = abs(Importance),
+    Variable = forcats::fct_reorder(Variable, Importance)
+  ) |>
+  filter(Importance != 0) |> 
+  ggplot(aes(x = Importance, y = Variable, fill = Sign)) +
+  geom_col() +
+  scale_x_continuous(expand = c(0, 0)) +
+  labs(y = NULL)
+
+
+#----------
+# Matrixs for LAT Test Data for the lowest rmse
+#----------
+
+final_lasso_fitted_test <- final_lasso %>% 
+  fit(data = data_train)
+
+test_predictions <- predict(final_lasso_fitted_test, new_data = data_test) %>% 
+  bind_cols(data_test)# Binding the predictions with the actual outcomes
+
+lasso_new_test_predictions <- test_predictions %>%
+  mutate(predicted_class = as.factor(if_else(.pred >= 0.5, 1, 0)),
+         actual_class = as.factor(strike_f))
+
+# Create a confusion matrix
+lasso_new_conf_mat <- conf_mat(lasso_new_test_predictions, truth = actual_class, estimate = predicted_class)
+
+# Print the confusion matrix
+print(lasso_new_conf_mat)
+```
+
+```{r}
+# For detailed evaluation metrics
+lasso_new_conf_mat %>%
+  summary()
+```
+
+```{r results='hide'}
+testlasso <- lasso_new_conf_mat %>%
+                  summary() %>% slice(1)
+testlasso <- testlasso[,-c(1:2)]
+tablasso <- testlasso %>% tt(digits = 3)
+colnames(tablasso) <- c("Lasso")
+tablasso
+```
+
+## Random Forest
+
+```{r message = FALSE, error=FALSE, warning=FALSE}
+#, results='hide'}
+
+# Create recipe
+rf_recipe1 <- recipe(strike_f ~ median_inc + earners + travel_work + rent +
+          assi_income + employed + poverty_rate + ba_rate, data = data_train) %>%
+  step_impute_mean(all_predictors())
+
+rf_model <- rand_forest(
+  mtry = tune(),
+  min_n = 5,
+  trees = tune()) %>%  
+  set_mode("classification") %>%
+  set_engine("ranger",
+             importance = "impurity") 
+
+# Create workflow
+rf_wflow <- workflow() %>%
+  add_recipe(rf_recipe1) %>%
+  add_model(rf_model)
+
+
+# Generate cross-validation sets for tuning our model 
+rf_folds <- vfold_cv(data_train, v = 10)
+
+# Create a set of tuning parameter values to search over
+rf_grid <- dials::grid_regular(
+  mtry(range = c(1, 8)),
+  trees(range = c(10, 1000)),
+  levels = 5
+)
+
+rf_model2 <- rand_forest(
+  mtry = tune(),
+  min_n = tune(),
+  trees = tune()) %>%  
+  set_mode("classification") %>%
+  set_engine("ranger",
+             importance = "impurity") 
+
+# Create workflow
+rf_wflow2 <- workflow() %>%
+  add_recipe(rf_recipe1) %>%
+  add_model(rf_model2)
+
+# Create a set of tuning parameter values to search over
+rf_grid2 <- dials::grid_regular(
+  mtry(range = c(1, 8)),
+  trees(range = c(10, 1000)),
+  min_n(range = c(5, 10)),
+  levels = 5
+)
+
+
+# Find appropriate tuning parameters
+rf_fit <- tune_grid(
+  object = rf_wflow, 
+  resamples = rf_folds, 
+  grid = rf_grid)
+
+rf_fit2 <- tune_grid(
+  object = rf_wflow2, 
+  resamples = rf_folds, 
+  grid = rf_grid2)
+
+# View the accuracy metric across models 
+rf_fit %>% 
+  collect_metrics() %>%
+  filter(.metric == "accuracy") %>%
+  select(mean, mtry, trees)
+
+rf_fit2 %>% 
+  collect_metrics() %>%
+  filter(.metric == "accuracy")
+print(rf_fit2)
+
+# Select the best RF model 
+rf_best_auc <- select_best(rf_fit, "accuracy")
+rf_best_auc2 <- select_best(rf_fit2, "accuracy")
+
+rf_wflow3 <- rf_wflow %>%
+  finalize_workflow(parameters = rf_best_auc) %>%
+  fit(data = data_train)
+
+rf_wflow4 <- rf_wflow2 %>%
+  finalize_workflow(parameters = rf_best_auc2) %>%
+  fit(data = data_train)
+
+vip(rf_wflow3)
+vip(rf_wflow4)
+
+rf_OOB_1 <- predict(rf_wflow3, new_data = data_test) %>%
+  as_tibble()
+rf_cm_1 <- caret::confusionMatrix(data=rf_OOB_1$.pred_class, reference = data_test$strike_f)
+
+rf_OOB_2 <- predict(rf_wflow4, new_data = data_test) %>% 
+  as_tibble()
+rf_cm_2 <- caret::confusionMatrix(data=rf_OOB_2$.pred_class, reference = data_test$strike_f)
+
+print(rf_cm_1)
+```
+
+```{r}
+print(rf_cm_2)
+```
+
+```{r results = 'hide'}
+#making table of Balanced Accuracy - in the case of RF its accuracy
+
+tabrf <- rf_cm_2[["overall"]][["Accuracy"]] %>% as.data.frame() %>% tt(digits = 3)
+colnames(tabrf) <- c("RF")
+tabrf
+```
+
+```{r}
+
+tottab <- cross_join(tablog, tabknn)
+tottab <- cross_join(tottab, tablasso) 
+tottab <- cross_join(tottab, tabrf)
+print("Table 1: Accuracy of Each Model (% of correct predictions)")
+tottab
+
+
+
+#gg_dta <- gg_roc(rf_wflow4, which.outcome=2)
+#plot(gg_dta)
+```
