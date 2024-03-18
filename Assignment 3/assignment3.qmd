@@ -438,13 +438,13 @@ knn_fit_cv_tm5 <- knn_workflow5 |>
   fit_resamples(data = data_train,
                 resamples = knn_folds_tm)
 
-# Collecting the mean ROC_AUC accuracy rate for each model
+# Collecting the mean accuracy rate for each model
 
-knn_success_tm1 <- collect_metrics(knn_fit_cv_tm1)$mean[2]
-knn_success_tm2 <- collect_metrics(knn_fit_cv_tm2)$mean[2]
-knn_success_tm3 <- collect_metrics(knn_fit_cv_tm3)$mean[2]
-knn_success_tm4 <- collect_metrics(knn_fit_cv_tm4)$mean[2]
-knn_success_tm5 <- collect_metrics(knn_fit_cv_tm5)$mean[2]
+knn_success_tm1 <- collect_metrics(knn_fit_cv_tm1)$mean[1]
+knn_success_tm2 <- collect_metrics(knn_fit_cv_tm2)$mean[1]
+knn_success_tm3 <- collect_metrics(knn_fit_cv_tm3)$mean[1]
+knn_success_tm4 <- collect_metrics(knn_fit_cv_tm4)$mean[1]
+knn_success_tm5 <- collect_metrics(knn_fit_cv_tm5)$mean[1]
 ```
 
 ```{r}
@@ -544,7 +544,7 @@ lasso_results <- lasso_grid %>%
   collect_metrics() 
 
 best_accuracy <- lasso_results %>%
-  filter(.metric == "roc_auc") %>%
+  filter(.metric == "accuracy") %>%
   arrange(desc(mean)) %>%
   slice(1) %>%
   pull(penalty)
@@ -701,20 +701,20 @@ rf_fit2 <- tune_grid(
   resamples = rf_folds, 
   grid = rf_grid2)
 
-# View the ROC metric across models 
+# View the accuracy metric across models 
 rf_fit %>% 
   collect_metrics() %>%
-  filter(.metric == "roc_auc") %>%
+  filter(.metric == "accuracy") %>%
   select(mean, mtry, trees)
 
 rf_fit2 %>% 
   collect_metrics() %>%
-  filter(.metric == "roc_auc")
+  filter(.metric == "accuracy")
 print(rf_fit2)
 
 # Select the best RF model 
-rf_best_auc <- select_best(rf_fit, "roc_auc")
-rf_best_auc2 <- select_best(rf_fit2, "roc_auc")
+rf_best_auc <- select_best(rf_fit, "accuracy")
+rf_best_auc2 <- select_best(rf_fit2, "accuracy")
 
 rf_wflow3 <- rf_wflow %>%
   finalize_workflow(parameters = rf_best_auc) %>%
@@ -743,7 +743,7 @@ print(rf_cm_2)
 ```
 
 ```{r results = 'hide'}
-#making table of Balanced Accuracy - in the case of RF its ROC_AUC
+#making table of Balanced Accuracy - in the case of RF its accuracy
 
 tabrf <- rf_cm_2[["overall"]][["Accuracy"]] %>% as.data.frame() %>% tt(digits = 3)
 colnames(tabrf) <- c("RF")
