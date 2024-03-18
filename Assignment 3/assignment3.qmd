@@ -12,7 +12,7 @@ execute:
 ## Introduction
 In this project our group built and compared four predictive models (Logistic Regression, KNN, LASSO, and Random Forest) in order to most accurately predict whether a labor action in the Labor Action Tracker (LAT) data set is a "strike" [1] or "non-strike" [0]. 
 
-The model chosen to be the final predictive model was the K-nearest neighbors (KNN) model 5.
+
 
 ```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
 library(tidycensus)
@@ -56,6 +56,7 @@ LAT_test <- readxl::read_xlsx("Data Raw/Labor action tracker data 2.26.24.xlsx")
 ```
 
 ## Data Cleaning--LAT Junyi & Edison
+how the LAT data was manipulated - 
 
 ```{r message = FALSE, error=FALSE, warning=FALSE, results='hide'}
 county <- tigris::counties(cb = TRUE)
@@ -80,7 +81,7 @@ LAT_train <- LAT_train %>%
 na_summary <- LAT_train %>%
   summarise_all(~ sum(is.na(.)))
 # yes, there is one in lon column. 
-LAT_train$lon[2830] = -85.73642799999999
+LAT_train$lon[2830] = -85.73642799999999 #how was this solved for?
 # transform LAT data into geometric data frame
 LAT_train <- st_as_sf(LAT_train, coords = c("lon", "lat"))
 # matching same projection
@@ -257,20 +258,24 @@ logistic_new_test_predictions <- test_predictions %>%
 
 # 6. Evaluate the Model
 logistic_test_conf_mat <- conf_mat(logistic_new_test_predictions, truth = actual_class, estimate = predicted_class)
-
+```
+```{r}
 # Print the confusion matrix
 print(logistic_test_conf_mat)
+```
 
+```{r}
 # Optionally, print summary metrics
 summary(logistic_test_conf_mat)
-
+```
+```{r results='hide'}
 testlog <- summary(logistic_test_conf_mat) %>% slice(9)
 testlog <- testlog[,-c(1:2)]
 tablog <- testlog %>% tt(digits = 3)
 colnames(tablog) <- c("Logistic BA")
 tablog
-
-
+```
+```{r}
 # Visualize the confusion matrix (if desired)
 autoplot(logistic_test_conf_mat)
 ```
@@ -437,8 +442,8 @@ knn_success_tm2 <- collect_metrics(knn_fit_cv_tm2)$mean[2]
 knn_success_tm3 <- collect_metrics(knn_fit_cv_tm3)$mean[2]
 knn_success_tm4 <- collect_metrics(knn_fit_cv_tm4)$mean[2]
 knn_success_tm5 <- collect_metrics(knn_fit_cv_tm5)$mean[2]
-
-
+```
+```{r}
 # Displaying the accuracy rates
 
 paste("Model 1 accuracy:", round(knn_success_tm1, 3))
@@ -464,20 +469,22 @@ knn_eval_test5 <- cbind("pop" = data_test$strike_f, knn_preds_test5)
 knn_cm_test5 <- conf_mat(data = knn_eval_test5,
                     truth = pop, 
                     estimate = .pred_class)
-
+```
+```{r}
 # Printing confusion matrices
-
 print("Confusion matrix for testing data:")
 knn_cm_test5
+```
+```{r}
 #what is the accuracy here based on the testing data?
 summary(knn_cm_test5)
-
+```
+```{r results='hide'}
 testknn <- summary(knn_cm_test5) %>% slice(9)
 testknn <- testknn[,-c(1:2)]
 tabknn <- testknn %>% tt(digits = 3)
 colnames(tabknn) <- c("KNN BA")
 tabknn
-
 ```
 
 ## LASSO
@@ -603,11 +610,13 @@ lasso_new_conf_mat <- conf_mat(lasso_new_test_predictions, truth = actual_class,
 
 # Print the confusion matrix
 print(lasso_new_conf_mat)
-
+```
+```{r}
 # For detailed evaluation metrics
 lasso_new_conf_mat %>%
   summary()
-
+```
+```{r results='hide'}
 testlasso <- lasso_new_conf_mat %>%
                   summary() %>% slice(9)
 testlasso <- testlasso[,-c(1:2)]
@@ -718,9 +727,11 @@ rf_OOB_2 <- predict(rf_wflow4, new_data = data_test) %>%
 rf_cm_2 <- caret::confusionMatrix(data=rf_OOB_2$.pred_class, reference = data_test$strike_f)
 
 print(rf_cm_1)
+```
+```{r}
 print(rf_cm_2)
-
-
+```
+```{r}
 #making table of Balanced Accuracy - in the case of RF its ROC_AUC
 
 tabrf <- rf_cm_2[["byClass"]][["Balanced Accuracy"]] %>% as.data.frame() %>% tt(digits = 3)
@@ -732,7 +743,6 @@ tottab <- cross_join(tablog, tabknn)
 tottab <- cross_join(tottab, tablasso) 
 tottab <- cross_join(tottab, tabrf)
 tottab
-
 
 #gg_dta <- gg_roc(rf_wflow4, which.outcome=2)
 #plot(gg_dta)
