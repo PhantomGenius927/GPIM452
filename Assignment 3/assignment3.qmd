@@ -557,8 +557,8 @@ lasso_model <- linear_reg(penalty = .1, mixture = 1) |>
 lasso_tune_spec <- linear_reg(penalty = tune(), mixture = 1) |> 
   set_engine("glmnet")
 # the sequence of penalty parameters to search over
-  penalty_grid <- tibble(
-  penalty = seq(0, 5, by = .01)
+penalty_grid <- tibble(
+  penalty = seq(0, 0.005, by = .00001)
 )
 
 #----------
@@ -612,7 +612,7 @@ lasso_grid_metrics |>
                 alpha = 0.5) +
   geom_line(size = 1.5) +
   # scale_x_log10() +
-  labs(x = "Penalty", y = "accuracy")
+  labs(x = "Penalty", y = "rmse")
 
 
 #Use the lowest_rmse to train the model
@@ -651,7 +651,7 @@ test_predictions <- predict(final_lasso_fitted_test, new_data = data_test) %>%
 
 lasso_new_test_predictions <- test_predictions %>%
   mutate(predicted_class = as.factor(if_else(.pred >= 0.5, 1, 0)),
-         actual_class = as.factor(strike_f))
+         actual_class = strike_f)
 
 # Create a confusion matrix
 lasso_new_conf_mat <- conf_mat(lasso_new_test_predictions, truth = actual_class, estimate = predicted_class)
