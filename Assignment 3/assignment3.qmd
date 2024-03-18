@@ -484,15 +484,56 @@ knn_cm_test5
 ```{r}
 #what is the accuracy here based on the testing data?
 summary(knn_cm_test5)
+
 ```
 
 ```{r results='hide'}
 testknn <- summary(knn_cm_test5) %>% slice(1)
 testknn <- testknn[,-c(1:2)]
+testknn$Accuracy <- testknn$.estimate
 tabknn <- testknn %>% tt(digits = 3)
 colnames(tabknn) <- c("KNN")
 tabknn
 ```
+
+
+# Bar Plot of Accuracy
+
+```{r results='hide'}
+
+library(ggplot2)
+
+
+knn_cm_test5_accuracy <- summary(knn_cm_test5) %>% slice(1)
+# Assuming knn_cm_test5_accuracy is a tibble or data frame
+knn_cm_test5_accuracy_value <- knn_cm_test5_accuracy %>% 
+  pull(.estimate)
+
+
+# Step 1: Create a data frame of accuracy rates
+model_names <- c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5","Model 5 in Test Data")
+accuracy_rates <- c(knn_success_tm1, knn_success_tm2, knn_success_tm3, knn_success_tm4, knn_success_tm5, knn_cm_test5_accuracy_value)
+
+# Round the accuracy rates to two decimal places before creating the plot
+accuracy_rates <- round(accuracy_rates, 4) # Here, rounding to 4 decimal places for more precision
+
+# Then create your accuracy_data data frame
+accuracy_data <- data.frame(Model = model_names, Accuracy = accuracy_rates)
+
+# Now plot the data with accuracy rates labeled on the bars
+ggplot(accuracy_data, aes(x = Model, y = Accuracy, fill = Model)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  geom_text(aes(label = sprintf("%.2f%%", Accuracy * 100)),
+            position = position_dodge(width = 0.9),
+            vjust = -0.2,
+            color = "black") +
+  theme_minimal() +
+  labs(title = "KNN Models Accuracy Rates in Validation Set and Test Data", 
+       x = "Model", y = "Accuracy Rate") +
+  scale_fill_brewer(palette = "Pastel1")
+
+```
+
 
 ## LASSO
 
