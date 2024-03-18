@@ -806,7 +806,7 @@ knn_cm_test5_accuracy_value <- knn_cm_test5_accuracy %>%
   pull(.estimate)
 
 # Step 1: Create a data frame of accuracy rates
-model_names <- c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5","M5 in Test Data")
+model_names <- c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5","Model 5 w/ Test Data")
 accuracy_rates <- c(knn_success_tm1, knn_success_tm2, knn_success_tm3, knn_success_tm4, knn_success_tm5, knn_cm_test5_accuracy_value)
 
 # Round the accuracy rates to two decimal places before creating the plot
