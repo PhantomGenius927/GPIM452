@@ -41,7 +41,7 @@ vars <- c(
   "B17001_002E" # below_poverty
   )
 
-census_api_key("8f18e1531b731fb432dd5a9657d8ee937a0290da", install = TRUE, overwrite = TRUE)
+# census_api_key("8f18e1531b731fb432dd5a9657d8ee937a0290da", install = TRUE, overwrite = TRUE)
 ACS <- get_acs(geography = "county", 
                     variables = vars, 
                     year = 2022,
