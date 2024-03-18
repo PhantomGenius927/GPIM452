@@ -763,7 +763,7 @@ tottest <- tottest %>% round(., digits = 3)
 #install.packages("gt")
 library(gt)
 
-table <- gt(tottest, caption = "Accuracy Rate for Prediction Models")
+table <- gt(tottest, caption = "Table 1: Accuracy Rate for All Models", auto_align = FALSE)
 table
 ```
 
