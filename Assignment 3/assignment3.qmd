@@ -81,7 +81,7 @@ LAT_train <- LAT_train %>%
 na_summary <- LAT_train %>%
   summarise_all(~ sum(is.na(.)))
 # yes, there is one in lon column. 
-LAT_train$lon[2830] = -85.73642799999999 #how was this solved for?
+LAT_train$lon[2830] = -85.73642799999999
 # transform LAT data into geometric data frame
 LAT_train <- st_as_sf(LAT_train, coords = c("lon", "lat"))
 # matching same projection
